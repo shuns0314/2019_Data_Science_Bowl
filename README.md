@@ -22,3 +22,4 @@
 ### その他
 - install_idはユニークだけど、デバイスを共有している可能性がある。
 - train data setでは、評価のないdataも含まれるが、test set では評価のないdataは含まれない。
+- private testには8MM(million) rows.
