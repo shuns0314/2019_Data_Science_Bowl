@@ -3,7 +3,8 @@ import numpy as np
 
 def qwk(a1, a2):
     """
-    Source: https://www.kaggle.com/c/data-science-bowl-2019/discussion/114133#latest-660168
+    Source:
+    https://www.kaggle.com/c/data-science-bowl-2019/discussion/114133#latest-660168
 
     :param a1:
     :param a2:
@@ -22,7 +23,7 @@ def qwk(a1, a2):
         i, j = a1[k], a2[k]
         hist1[i] += 1
         hist2[j] += 1
-        o +=  (i - j) * (i - j)
+        o += (i - j) * (i - j)
 
     e = 0
     for i in range(max_rat + 1):
