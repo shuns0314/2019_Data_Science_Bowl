@@ -23,3 +23,8 @@
 - install_idはユニークだけど、デバイスを共有している可能性がある。
 - train data setでは、評価のないdataも含まれるが、test set では評価のないdataは含まれない。
 - private testには8MM(million) rows.
+
+## 環境構築
+1. kaggle.jsonを一番上のフォルダ上に配置する。
+2. docker-compose up app
+3. docker-compose run app -d /bin/bash
