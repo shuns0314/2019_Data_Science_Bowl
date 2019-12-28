@@ -8,3 +8,4 @@ RUN chmod 600 ~/.kaggle/kaggle.json
 WORKDIR /code
 COPY . /code
 RUN pip install -r requirements.txt
+ENV PYTHONPATH='/code'
