@@ -1,2 +1,6 @@
 data/*
+models/*
 .mypy_cache/*
+kaggle.json
+*.pyc
+!.gitkeep
