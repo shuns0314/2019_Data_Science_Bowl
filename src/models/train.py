@@ -5,6 +5,9 @@ import pandas as pd
 import lightgbm as lgb
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
+import optuna
+
+from loss_function import qwk
 
 
 parser = argparse.ArgumentParser()
@@ -18,14 +21,17 @@ def main():
     # print(train_df.head())
     y = train_df['accuracy_group']
     x = train_df.drop('accuracy_group', axis=1)
-    lgb_regression(x, y)
+
+    x_train, x_bayes, y_train, y_bayes = train_test_split(x, y, test_size=0.15)
+    model = lgb_regression(x, y)
+    y_pred = model.predict(x_bayes)
+    post_processing(y_bayes, y_pred)
 
 
-def lgb_regression(x, y):
-    x_train, x_test, y_train, y_test = train_test_split(x, y)
+def lgb_regression(x: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
+    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2)
     lgb_train = lgb.Dataset(x_train, y_train)
-    lgb_val = lgb.Dataset(x_test, y_test, reference=lgb_train)
-    print(x_train.columns)
+    lgb_val = lgb.Dataset(x_val, y_val, reference=lgb_train)
     lgb_params = {
         'objective': 'regression',
         'metric': 'rmse',
@@ -35,11 +41,53 @@ def lgb_regression(x, y):
                       train_set=lgb_train,
                       valid_sets=lgb_val)
 
-    y_pred = model.predict(x_test, num_iteration=model.best_iteration)
-    mse = mean_squared_error(y_test, y_pred)
+    y_pred = model.predict(x_val, num_iteration=model.best_iteration)
+    mse = mean_squared_error(y_val, y_pred)
     rmse = np.sqrt(mse)
     print(rmse)
     print(y_pred)
+
+    return model
+
+
+def post_processing(y_test, y_pred):
+
+    def objectives(trial):
+        params = {
+            'threshold_0': trial.suggest_uniform('threshold_0', 0.0, 3.0),
+            'threshold_1': trial.suggest_uniform('threshold_1', 0.0, 3.0),
+            'threshold_2': trial.suggest_uniform('threshold_2', 0.0, 3.0),
+        }
+        func = np.frompyfunc(threshold, 2, 1)
+        post_pred = func(y_pred, params)
+        loss = qwk(y_test, post_pred)
+
+        return loss
+
+    def threshold(x, params):
+        if x < params['threshold_0']:
+            y = 0
+        elif x < params['threshold_1']:
+            y = 1
+        elif x < params['threshold_2']:
+            y = 2
+        else:
+            y = 3
+        return y
+
+    study = optuna.create_study(direction='maximize')
+    study.optimize(objectives, n_trials=100)
+
+    print(f'Number of finished trials: {len(study.trials)}')
+
+    print('Best trial:')
+    trial = study.best_trial
+
+    print(f'  Value: {trial.value}')
+
+    print(f'  Params: ')
+    for key, value in trial.params.ite2ms():
+        print(f'    {key}: {value}')
 
 
 if __name__ == "__main__":
