@@ -23,7 +23,6 @@ class GetData():
 
         get_assesments = GetAssessmentFeature(self.win_code,
                                               test_set=self.test_set)
-        # test
 
         # まずgame_sessionでgroupbyする
         for i, session in user_sample.groupby('game_session', sort=False):
