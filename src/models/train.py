@@ -8,6 +8,11 @@ from sklearn.metrics import mean_squared_error
 import optuna
 
 from loss_function import qwk
+from sklearn.externals import joblib
+
+
+# load model
+# gbm_pickle = joblib.load('lgb.pkl')
 
 
 parser = argparse.ArgumentParser()
@@ -22,10 +27,17 @@ def main():
     y = train_df['accuracy_group']
     x = train_df.drop('accuracy_group', axis=1)
 
-    x_train, x_bayes, y_train, y_bayes = train_test_split(x, y, test_size=0.15)
-    model = lgb_regression(x, y)
-    y_pred = model.predict(x_bayes)
-    post_processing(y_bayes, y_pred)
+    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.15)
+    model, params = lgb_regression(x_train, y_train)
+    y_pred = model.predict(x_val)
+    y_pred = threshold(y_pred, params)
+
+    func = np.frompyfunc(threshold, 2, 1)
+    post_pred = func(y_pred, params)
+    loss = qwk(y_val, post_pred)
+    print(f"val_loss* {loss}")
+
+    # joblib.dump(model, 'lgb.pkl')
 
 
 def lgb_regression(x: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
@@ -47,7 +59,9 @@ def lgb_regression(x: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
     print(rmse)
     print(y_pred)
 
-    return model
+    params = post_processing(y_val, y_pred)
+
+    return model, params
 
 
 def post_processing(y_test, y_pred):
@@ -64,17 +78,6 @@ def post_processing(y_test, y_pred):
 
         return loss
 
-    def threshold(x, params):
-        if x < params['threshold_0']:
-            y = 0
-        elif x < params['threshold_1']:
-            y = 1
-        elif x < params['threshold_2']:
-            y = 2
-        else:
-            y = 3
-        return y
-
     study = optuna.create_study(direction='maximize')
     study.optimize(objectives, n_trials=100)
 
@@ -88,6 +91,20 @@ def post_processing(y_test, y_pred):
     print(f'  Params: ')
     for key, value in trial.params.ite2ms():
         print(f'    {key}: {value}')
+
+    return trial.params.ite2ms()
+
+
+def threshold(x, params):
+    if x < params['threshold_0']:
+        y = 0
+    elif x < params['threshold_1']:
+        y = 1
+    elif x < params['threshold_2']:
+        y = 2
+    else:
+        y = 3
+    return y
 
 
 if __name__ == "__main__":
