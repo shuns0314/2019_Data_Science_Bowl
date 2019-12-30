@@ -1,6 +1,7 @@
 
 data/*
-models/*
+models/*/*.csv
+models/*/*.pkl
 .mypy_cache/*
 kaggle.json
 *.pyc
