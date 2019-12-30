@@ -21,11 +21,13 @@ def main():
 
     test_df = pd.read_csv(f'data/processed/{args.test_csv}.csv', index_col=0)
     test_df = test_df.drop('accuracy_group', axis=1)
-
     pred_df = model.predict(test_df)
     func = np.frompyfunc(threshold, 2, 1)
     post_pred = func(pred_df, params)
-    submission = pd.DataFrame(post_pred)
+
+    submission = pd.read_csv('data/raw/sample_submission.csv')
+    submission['accuracy_group'] = post_pred.astype(int)
+    print(submission.dtypes)
     submission.to_csv(f'models/{args.model}/submission.csv', index=False)
 
 
