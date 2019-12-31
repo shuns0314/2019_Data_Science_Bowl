@@ -18,7 +18,7 @@ class GetData():
         self.test_set = test_set
         self.count_actions = 0
 
-    def process(self, user_sample):
+    def process(self, user_sample, installation_id):
         all_assessments = []
 
         get_assesments = GetAssessmentFeature(self.win_code,
@@ -44,6 +44,7 @@ class GetData():
                 features = get_assesments.process(session, features)
 
                 if features is not None:
+                    features['installation_id'] = installation_id
                     # 特徴量に前回までのゲームの回数を追加
                     features['count_actions'] = self.count_actions
                     all_assessments.append(features)
@@ -120,7 +121,7 @@ class GetAssessmentFeature:
                 # print(0)
                 pass
             else:
-                print(features)
+                # print(features)
                 return features
 
     def add_duration_mean(self, df, session):

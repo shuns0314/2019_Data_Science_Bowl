@@ -1,5 +1,6 @@
 import argparse
 from typing import Tuple
+from datetime import datetime
 
 import pandas as pd
 import numpy as np
@@ -53,8 +54,9 @@ def preprocess(train_df: pd.DataFrame,
     compile_history = CompileHistory(win_code=win_code, test_set=True)
     compiled_test = compile_history.compile_history_data(test_df)
 
-    compiled_train.to_csv('/code/data/processed/proceeded_train.csv')
-    compiled_test.to_csv('/code/data/processed/proceeded_test.csv')
+    now = datetime.now().strftime('%Y%m%d_%H%M%S')
+    compiled_train.to_csv(f'/code/data/processed/proceeded_train_{now}.csv')
+    compiled_test.to_csv(f'/code/data/processed/proceeded_test_{now}.csv')
 
 
 def encode_title(train_df: pd.DataFrame,
@@ -106,8 +108,8 @@ class CompileHistory:
         get_data = GetData(win_code=self.win_code, test_set=self.test_set)
         compiled_data = Parallel(n_jobs=-1)(
             [delayed(self.get_data_for_sort)(
-                user_sample, i, get_data
-                ) for i, (_, user_sample) in enumerate(
+                user_sample, i, get_data, installation_id
+                ) for i, (installation_id, user_sample) in enumerate(
                     df.groupby('installation_id', sort=False)
                     )]
         )
@@ -122,8 +124,9 @@ class CompileHistory:
     def get_data_for_sort(self,
                           data: pd.DataFrame,
                           i: int,
-                          get_data: GetData) -> Tuple[pd.DataFrame, int]:
-        compiled_data = get_data.process(data)
+                          get_data: GetData,
+                          installation_id: str) -> Tuple[pd.DataFrame, int]:
+        compiled_data = get_data.process(data, installation_id)
         # print(f"compiled_data: {compiled_data}")
         return compiled_data, i
 
