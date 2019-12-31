@@ -1,10 +1,11 @@
 from typing import Tuple
+import random
+from collections import Counter, defaultdict
 
 import pandas as pd
 import numpy as np
 from joblib import Parallel, delayed
 import optuna
-from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_squared_error
 import lightgbm as lgb
 
@@ -91,7 +92,7 @@ class GetData():
         self.test_set = test_set
         self.count_actions = 0
 
-    def process(self, user_sample):
+    def process(self, user_sample, installation_id):
         all_assessments = []
 
         get_assesments = GetAssessmentFeature(self.win_code,
@@ -117,6 +118,7 @@ class GetData():
                 features = get_assesments.process(session, features)
 
                 if features is not None:
+                    features['installation_id'] = installation_id
                     # 特徴量に前回までのゲームの回数を追加
                     features['count_actions'] = self.count_actions
                     all_assessments.append(features)
@@ -252,8 +254,8 @@ class CompileHistory:
         get_data = GetData(win_code=self.win_code, test_set=self.test_set)
         compiled_data = Parallel(n_jobs=-1)(
             [delayed(self.get_data_for_sort)(
-                user_sample, i, get_data
-                ) for i, (_, user_sample) in enumerate(
+                user_sample, i, get_data, installation_id
+                ) for i, (installation_id, user_sample) in enumerate(
                     df.groupby('installation_id', sort=False)
                     )]
         )
@@ -268,8 +270,9 @@ class CompileHistory:
     def get_data_for_sort(self,
                           data: pd.DataFrame,
                           i: int,
-                          get_data: GetData) -> Tuple[pd.DataFrame, int]:
-        compiled_data = get_data.process(data)
+                          get_data: GetData,
+                          installation_id: str) -> Tuple[pd.DataFrame, int]:
+        compiled_data = get_data.process(data, installation_id)
         # print(f"compiled_data: {compiled_data}")
         return compiled_data, i
 
@@ -308,13 +311,67 @@ def qwk(a1, a2):
     return 1 - o / e
 
 
+
+def stratified_group_k_fold(X, y, groups, k, seed=None):
+    # ラベルの数をカウント
+    labels_num = np.max(y) + 1
+    # 各グループのラベルの数をカウントする
+    y_counts_per_group = defaultdict(lambda: np.zeros(labels_num))
+    y_distr = Counter()
+    for label, g in zip(y, groups):
+        y_counts_per_group[g][label] += 1
+        y_distr[label] += 1
+    # 各フォールドのラベルの数をカウント
+    y_counts_per_fold = defaultdict(lambda: np.zeros(labels_num))
+    groups_per_fold = defaultdict(set)
+
+    def eval_y_counts_per_fold(y_counts, fold):
+        y_counts_per_fold[fold] += y_counts
+        std_per_label = []
+        for label in range(labels_num):
+            label_std = np.std([y_counts_per_fold[i][label] / y_distr[label] for i in range(k)])
+            std_per_label.append(label_std)
+        y_counts_per_fold[fold] -= y_counts
+        return np.mean(std_per_label)
+
+    groups_and_y_counts = list(y_counts_per_group.items())
+    random.Random(seed).shuffle(groups_and_y_counts)
+
+    for g, y_counts in sorted(groups_and_y_counts, key=lambda x: -np.std(x[1])):
+        best_fold = None
+        min_eval = None
+        for i in range(k):
+            fold_eval = eval_y_counts_per_fold(y_counts, i)
+            if min_eval is None or fold_eval < min_eval:
+                min_eval = fold_eval
+                best_fold = i
+        y_counts_per_fold[best_fold] += y_counts
+        groups_per_fold[best_fold].add(g)
+
+    all_groups = set(groups)
+
+    for i in range(k):
+        test_k = i
+        val_k = i+1 if i+1 != k else 0
+        print(val_k)
+        train_groups = all_groups - groups_per_fold[test_k] - groups_per_fold[val_k]
+        val_groups = groups_per_fold[val_k]
+        test_groups = groups_per_fold[test_k]
+
+        train_indices = [i for i, g in enumerate(groups) if g in train_groups]
+        val_indices = [i for i, g in enumerate(groups) if g in val_groups]
+        test_indices = [i for i, g in enumerate(groups) if g in test_groups]
+
+        yield train_indices, val_indices, test_indices
+
+
 def post_processing(y_test, y_pred):
 
     def objectives(trial):
         params = {
-            'threshold_0': trial.suggest_uniform('threshold_0', 0.0, 3.0),
-            'threshold_1': trial.suggest_uniform('threshold_1', 0.0, 3.0),
-            'threshold_2': trial.suggest_uniform('threshold_2', 0.0, 3.0),
+            'threshold_0': trial.suggest_uniform('threshold_0', 0.0, 1.5),
+            'threshold_1': trial.suggest_uniform('threshold_1', 1.2, 2.0),
+            'threshold_2': trial.suggest_uniform('threshold_2', 2.0, 3.0),
         }
         func = np.frompyfunc(threshold, 2, 1)
         post_pred = func(y_pred, params)
@@ -323,7 +380,7 @@ def post_processing(y_test, y_pred):
         return loss
 
     study = optuna.create_study(direction='maximize')
-    study.optimize(objectives, n_trials=100)
+    study.optimize(objectives, n_trials=150)
 
     print(f'Number of finished trials: {len(study.trials)}')
 
@@ -358,42 +415,71 @@ def train_main(train_df):
     y = train_df['accuracy_group']
     x = train_df.drop('accuracy_group', axis=1)
 
-    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.15)
-    model, params = lgb_regression(x_train, y_train)
-    y_pred = model.predict(x_val)
-    func = np.frompyfunc(threshold, 2, 1)
-    post_pred = func(y_pred, params)
-    loss = qwk(y_val, post_pred)
-    print(f"val_loss: {loss}")
+    model, params = lgb_regression(x, y)
+
     return model, params
 
 
 def lgb_regression(x: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
-    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2)
-    lgb_train = lgb.Dataset(x_train, y_train)
-    lgb_val = lgb.Dataset(x_val, y_val, reference=lgb_train)
+
+    num_fold = 5
+    groups = np.array(x['installation_id'])
+
     lgb_params = {
-        'objective': 'regression',
-        'metric': 'rmse',
-    }
+            'objective': 'regression',
+            'metric': 'rmse',
+        }
+    x = x.drop('installation_id', axis=1)
 
-    model = lgb.train(params=lgb_params,
-                      train_set=lgb_train,
-                      valid_sets=lgb_val)
+    total_pred = np.zeros(y.shape)
+    total_params = {
+            'threshold_0': 0,
+            'threshold_1': 0,
+            'threshold_2': 0,
+        }
+    for fold_ind, (train_ind, val_ind, test_ind) in enumerate(
+            stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=77)):
+        # print(dev_ind)
+        x_train = x.iloc[train_ind]
+        y_train = y.iloc[train_ind]
+        x_val = x.iloc[val_ind]
+        y_val = y.iloc[val_ind]
+        x_test = x.iloc[test_ind]
+        y_test = y.iloc[test_ind]
 
-    y_pred = model.predict(x_val, num_iteration=model.best_iteration)
-    mse = mean_squared_error(y_val, y_pred)
-    rmse = np.sqrt(mse)
-    print(rmse)
-    print(y_pred)
+        lgb_train = lgb.Dataset(x_train, y_train)
+        lgb_val = lgb.Dataset(x_val, y_val, reference=lgb_train)
 
-    params = post_processing(y_val, y_pred)
+        model = lgb.train(params=lgb_params,
+                          train_set=lgb_train,
+                          valid_sets=lgb_val)
 
-    return model, params
+        y_val_pred = model.predict(x_val, num_iteration=model.best_iteration)
+        mse = mean_squared_error(y_val, y_val_pred)
+        rmse = np.sqrt(mse)
+
+        params = post_processing(y_val, y_val_pred)
+        total_params['threshold_0'] += params['threshold_0']/num_fold
+        total_params['threshold_1'] += params['threshold_1']/num_fold
+        total_params['threshold_2'] += params['threshold_2']/num_fold
+        y_pred = model.predict(x_test, num_iteration=model.best_iteration)
+        mse = mean_squared_error(y_test, y_pred)
+        rmse = np.sqrt(mse)
+        print(rmse)
+        total_pred[test_ind] = y_pred
+
+    func = np.frompyfunc(threshold, 2, 1)
+    post_pred = func(total_pred, total_params)
+    loss = qwk(y, post_pred)
+    print(f"val_loss: {loss}")
+    print(f"total_params: {total_params}")
+
+    return model, total_params
 
 
 def predict_main(test_df, model, params):
     test_df = test_df.drop('accuracy_group', axis=1)
+    test_df = test_df.drop('installation_id', axis=1)
 
     pred_df = model.predict(test_df)
     func = np.frompyfunc(threshold, 2, 1)
@@ -415,6 +501,7 @@ def main():
     compiled_train, compiled_test = preprocess(train_df,
                                                test_df,
                                                train_labels_df)
+    print(compiled_train.shape, compiled_test.shape)
     print('--train--')
     model, params = train_main(compiled_train)
 
