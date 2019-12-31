@@ -8,9 +8,9 @@ def post_processing(y_test, y_pred):
 
     def objectives(trial):
         params = {
-            'threshold_0': trial.suggest_uniform('threshold_0', 0.0, 3.0),
-            'threshold_1': trial.suggest_uniform('threshold_1', 0.0, 3.0),
-            'threshold_2': trial.suggest_uniform('threshold_2', 0.0, 3.0),
+            'threshold_0': trial.suggest_uniform('threshold_0', 0.0, 1.5),
+            'threshold_1': trial.suggest_uniform('threshold_1', 1.2, 2.0),
+            'threshold_2': trial.suggest_uniform('threshold_2', 2.0, 3.0),
         }
         func = np.frompyfunc(threshold, 2, 1)
         post_pred = func(y_pred, params)
@@ -19,7 +19,7 @@ def post_processing(y_test, y_pred):
         return loss
 
     study = optuna.create_study(direction='maximize')
-    study.optimize(objectives, n_trials=100)
+    study.optimize(objectives, n_trials=2)
 
     print(f'Number of finished trials: {len(study.trials)}')
 
