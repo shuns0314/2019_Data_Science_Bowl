@@ -12,10 +12,12 @@ import joblib
 
 from loss_function import qwk
 from post_process import post_processing, threshold
+from closs_validation import stratified_group_k_fold
 
 
 parser = argparse.ArgumentParser()
 parser.add_argument('train_csv', type=str)
+parser.add_argument('--test_csv', type=str, default=None)
 parser.add_argument('--name', type=str)
 
 
@@ -23,25 +25,24 @@ def main():
     """main."""
     args = parser.parse_args()
     train_df = pd.read_csv(f"data/processed/{args.train_csv}.csv", index_col=0)
-    # print(train_df.head())
-    y = train_df['accuracy_group']
-    x = train_df.drop('accuracy_group', axis=1)
 
-    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.15)
-    model, params = lgb_regression(x_train, y_train)
-    y_pred = model.predict(x_val)
-    # print(type(y_pred))
-    func = np.frompyfunc(threshold, 2, 1)
-    post_pred = func(y_pred, params)
-    loss = qwk(y_val, post_pred)
-    print(f"val_loss: {loss}")
-
+    # folderの作成
     if args.name is None:
         now = datetime.now().strftime('%Y%m%d_%H%M%S')
         args.name = f'lgb_{args.train_csv}_{now}'
-
     if not os.path.exists(f'models/{args.name}'):
         os.makedirs(f'models/{args.name}')
+
+    if args.test_csv == 'None':
+        model, params, pred_df = lgb_regression(train_df)
+    else:
+        coefficient = train_df['accuracy_group'].value_counts(sort=False)/len(train_df['accuracy_group'])
+        test_df = pd.read_csv(f"data/processed/{args.test_csv}.csv", index_col=0)
+        model, params, pred_df = lgb_regression(train_df, test_df)
+        print(coefficient)
+        pred_df.to_csv(f'models/{args.name}/check_cv.csv')
+        pred_df = pred_df.apply(lambda x: x.mode()[0] if len(x.mode()) == 1 else coefficient[x.mode()].idxmax(), axis=1)
+        pred_df.to_csv(f'models/{args.name}/submission.csv', header=False)
 
     # modelのsave
     joblib.dump(model, f'models/{args.name}/model_{args.name}.pkl')
@@ -51,28 +52,72 @@ def main():
         pickle.dump(params, handle)
 
 
-def lgb_regression(x: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
-    x_train, x_val, y_train, y_val = train_test_split(x, y, test_size=0.2)
-    lgb_train = lgb.Dataset(x_train, y_train)
-    lgb_val = lgb.Dataset(x_val, y_val, reference=lgb_train)
+def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.DataFrame:
+
+    num_fold = 5
+
+    y = train_df['accuracy_group']
+    x = train_df.drop('accuracy_group', axis=1)
+    groups = np.array(x['installation_id'])
+
     lgb_params = {
-        'objective': 'regression',
-        'metric': 'rmse',
-    }
+            'objective': 'regression',
+            'metric': 'rmse',
+        }
 
-    model = lgb.train(params=lgb_params,
-                      train_set=lgb_train,
-                      valid_sets=lgb_val)
+    x = x.drop('installation_id', axis=1)
+    total_pred = np.zeros(y.shape)
 
-    y_pred = model.predict(x_val, num_iteration=model.best_iteration)
-    mse = mean_squared_error(y_val, y_pred)
-    rmse = np.sqrt(mse)
-    print(rmse)
-    print(y_pred)
+    func = np.frompyfunc(threshold, 2, 1)
 
-    params = post_processing(y_val, y_pred)
+    if test_df is not None:
+        test_x = test_df.drop('accuracy_group', axis=1)
+        test_x = test_x.drop('installation_id', axis=1)
+        total_test_pred = np.zeros([test_df.shape[0], num_fold])
+        print(total_test_pred.shape)
 
-    return model, params
+    all_params = []
+
+    for fold_ind, (train_ind, val_ind, test_ind) in enumerate(
+            stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=77)):
+        # print(dev_ind)
+        x_train = x.iloc[train_ind]
+        y_train = y.iloc[train_ind]
+        x_val = x.iloc[val_ind]
+        y_val = y.iloc[val_ind]
+        x_test = x.iloc[test_ind]
+        # y_test = y.iloc[test_ind]
+
+        lgb_train = lgb.Dataset(x_train, y_train)
+        lgb_val = lgb.Dataset(x_val, y_val, reference=lgb_train)
+
+        model = lgb.train(params=lgb_params,
+                          train_set=lgb_train,
+                          valid_sets=lgb_val)
+
+        y_val_pred = model.predict(x_val, num_iteration=model.best_iteration)
+
+        params = post_processing(y_val, y_val_pred)
+        all_params.append(params)
+
+        y_pred = model.predict(x_test, num_iteration=model.best_iteration)
+        y_pred = func(y_pred, params)
+        total_pred[test_ind] = y_pred
+
+        if test_df is not None:
+            test_pred = model.predict(
+                test_x, num_iteration=model.best_iteration)
+            test_pred = func(test_pred, params)
+            total_test_pred[:, fold_ind] = test_pred
+
+
+    loss = qwk(y, total_pred)
+    print(f"val_loss: {loss}")
+
+    if test_df is None:
+        return model, all_params
+    else:
+        return model, all_params, pd.DataFrame(total_test_pred)
 
 
 if __name__ == "__main__":
