@@ -410,33 +410,41 @@ def threshold(x, params):
 
 
 # train
-def train_main(train_df):
+def train_main(train_df, test_df):
     """main."""
-    y = train_df['accuracy_group']
-    x = train_df.drop('accuracy_group', axis=1)
+    _, _, pred_df = lgb_regression(train_df, test_df)
+    coefficient = train_df['accuracy_group'].value_counts(sort=False)/len(train_df['accuracy_group'])
+    print(coefficient)
+    pred_df = pred_df.apply(lambda x: x.mode()[0] if len(x.mode()) == 1 else coefficient[x.mode()].idxmax(), axis=1)
+    return pred_df
 
-    model, params = lgb_regression(x, y)
 
-    return model, params
-
-
-def lgb_regression(x: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
+def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.DataFrame:
 
     num_fold = 5
+
+    y = train_df['accuracy_group']
+    x = train_df.drop('accuracy_group', axis=1)
     groups = np.array(x['installation_id'])
 
     lgb_params = {
             'objective': 'regression',
             'metric': 'rmse',
         }
-    x = x.drop('installation_id', axis=1)
 
+    x = x.drop('installation_id', axis=1)
     total_pred = np.zeros(y.shape)
-    total_params = {
-            'threshold_0': 0,
-            'threshold_1': 0,
-            'threshold_2': 0,
-        }
+
+    func = np.frompyfunc(threshold, 2, 1)
+
+    if test_df is not None:
+        test_x = test_df.drop('accuracy_group', axis=1)
+        test_x = test_x.drop('installation_id', axis=1)
+        total_test_pred = np.zeros([test_df.shape[0], num_fold])
+        print(total_test_pred.shape)
+
+    all_params = []
+
     for fold_ind, (train_ind, val_ind, test_ind) in enumerate(
             stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=77)):
         # print(dev_ind)
@@ -445,7 +453,7 @@ def lgb_regression(x: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
         x_val = x.iloc[val_ind]
         y_val = y.iloc[val_ind]
         x_test = x.iloc[test_ind]
-        y_test = y.iloc[test_ind]
+        # y_test = y.iloc[test_ind]
 
         lgb_train = lgb.Dataset(x_train, y_train)
         lgb_val = lgb.Dataset(x_val, y_val, reference=lgb_train)
@@ -455,37 +463,29 @@ def lgb_regression(x: pd.DataFrame, y: pd.Series) -> pd.DataFrame:
                           valid_sets=lgb_val)
 
         y_val_pred = model.predict(x_val, num_iteration=model.best_iteration)
-        mse = mean_squared_error(y_val, y_val_pred)
-        rmse = np.sqrt(mse)
 
         params = post_processing(y_val, y_val_pred)
-        total_params['threshold_0'] += params['threshold_0']/num_fold
-        total_params['threshold_1'] += params['threshold_1']/num_fold
-        total_params['threshold_2'] += params['threshold_2']/num_fold
+        all_params.append(params)
+
         y_pred = model.predict(x_test, num_iteration=model.best_iteration)
-        mse = mean_squared_error(y_test, y_pred)
-        rmse = np.sqrt(mse)
-        print(rmse)
+        y_pred = func(y_pred, params)
         total_pred[test_ind] = y_pred
 
-    func = np.frompyfunc(threshold, 2, 1)
-    post_pred = func(total_pred, total_params)
-    loss = qwk(y, post_pred)
+        if test_df is not None:
+            test_pred = model.predict(
+                test_x, num_iteration=model.best_iteration)
+            test_pred = func(test_pred, params)
+            total_test_pred[:, fold_ind] = test_pred
+
+    loss = qwk(y, total_pred)
     print(f"val_loss: {loss}")
-    print(f"total_params: {total_params}")
 
-    return model, total_params
+    return model, all_params, pd.DataFrame(total_test_pred)
 
 
-def predict_main(test_df, model, params):
-    test_df = test_df.drop('accuracy_group', axis=1)
-    test_df = test_df.drop('installation_id', axis=1)
-
-    pred_df = model.predict(test_df)
-    func = np.frompyfunc(threshold, 2, 1)
-    post_pred = func(pred_df, params)
+def predict_main(pred_df):
     submission = pd.read_csv(f'{RAW_PATH}/sample_submission.csv')
-    submission['accuracy_group'] = post_pred.astype(int)
+    submission['accuracy_group'] = pred_df.astype(int)
     print(submission.dtypes)
     submission.to_csv(f'submission.csv', index=False)
 
@@ -503,10 +503,10 @@ def main():
                                                train_labels_df)
     print(compiled_train.shape, compiled_test.shape)
     print('--train--')
-    model, params = train_main(compiled_train)
+    pred_df = train_main(compiled_train, compiled_test)
 
     print('--predict--')
-    predict_main(compiled_test, model, params)
+    predict_main(pred_df)
 
 
 if __name__ == "__main__":

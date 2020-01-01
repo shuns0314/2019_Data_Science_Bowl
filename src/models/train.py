@@ -36,9 +36,13 @@ def main():
     if args.test_csv == 'None':
         model, params, pred_df = lgb_regression(train_df)
     else:
+        coefficient = train_df['accuracy_group'].value_counts(sort=False)/len(train_df['accuracy_group'])
         test_df = pd.read_csv(f"data/processed/{args.test_csv}.csv", index_col=0)
         model, params, pred_df = lgb_regression(train_df, test_df)
-        pred_df.to_csv(f'models/{args.name}/submission.csv')
+        print(coefficient)
+        pred_df.to_csv(f'models/{args.name}/check_cv.csv')
+        pred_df = pred_df.apply(lambda x: x.mode()[0] if len(x.mode()) == 1 else coefficient[x.mode()].idxmax(), axis=1)
+        pred_df.to_csv(f'models/{args.name}/submission.csv', header=False)
 
     # modelのsave
     joblib.dump(model, f'models/{args.name}/model_{args.name}.pkl')
@@ -101,7 +105,11 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         total_pred[test_ind] = y_pred
 
         if test_df is not None:
-            total_test_pred[:, fold_ind] = model.predict(test_x, num_iteration=model.best_iteration)
+            test_pred = model.predict(
+                test_x, num_iteration=model.best_iteration)
+            test_pred = func(test_pred, params)
+            total_test_pred[:, fold_ind] = test_pred
+
 
     loss = qwk(y, total_pred)
     print(f"val_loss: {loss}")
@@ -109,7 +117,7 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
     if test_df is None:
         return model, all_params
     else:
-        return model, all_params, total_test_pred
+        return model, all_params, pd.DataFrame(total_test_pred)
 
 
 if __name__ == "__main__":
