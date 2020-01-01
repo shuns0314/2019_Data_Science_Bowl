@@ -421,7 +421,7 @@ def train_main(train_df, test_df):
 
 def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.DataFrame:
 
-    num_fold = 5
+    num_fold = 8
 
     y = train_df['accuracy_group']
     x = train_df.drop('accuracy_group', axis=1)
