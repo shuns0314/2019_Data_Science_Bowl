@@ -18,6 +18,41 @@ class GetData():
         self.test_set = test_set
         self.count_actions = 0
 
+        # event_data
+        self.version = 0
+        self.castles_placed = 0
+        self.molds = 0
+        self.sand = 0
+        self.filled = 0
+        self.movie_id = 0
+        self.options = 0
+        self.animals = 0
+        self.round_target_size = 0
+        self.round_target_type = 0
+        self.round_target_animal = 0
+        self.item_type = 0
+        self.position = 0
+        self.animal = 0
+        self.correct = 0
+        self.misses = 0
+        self.holding_shell = 0
+        self.has_water = 0
+        self.shells = 0
+        self.holes = 0
+        self.shell_size = 0
+        self.hole_position = 0
+        self.cloud = 0
+        self.cloud_size = 0
+        self.water_level = 0
+        self.time_played = 0
+        # elf.houses = 0
+        # self.dinosaurs = 0
+        # self.dinosaur = 0
+        self.dinosaurs_placed = 0
+        self.house_size = 0
+        self.house_position = 0
+
+
     def process(self, user_sample, installation_id):
         all_assessments = []
 
@@ -47,9 +82,74 @@ class GetData():
                     features['installation_id'] = installation_id
                     # 特徴量に前回までのゲームの回数を追加
                     features['count_actions'] = self.count_actions
+
+                    features['version'] = self.version
+                    features['castles_placed'] = self.castles_placed
+                    features['molds'] = self.molds
+                    features['sand'] = self.sand
+                    features['filled'] = self.filled
+                    features['movie_id'] = self.movie_id
+                    features['options'] = self.options
+                    features['animals'] = self.animals
+                    features['round_target.size'] = self.round_target_size
+                    features['round_target.type'] = self.round_target_type
+                    features['round_target.animal'] = self.round_target_animal
+                    features['item_type'] = self.item_type
+                    features['position'] = self.position
+                    features['animal'] = self.animal
+                    features['correct'] = self.correct
+                    features['misses'] = self.misses
+                    features['holding_shell'] = self.holding_shell
+                    features['has_water'] = self.has_water
+                    features['shells'] = self.shells
+                    features['holes'] = self.holes
+                    features['shell_size'] = self.shell_size
+                    features['hole_position'] = self.hole_position
+                    features['cloud'] = self.cloud
+                    features['cloud_size'] = self.cloud_size
+                    features['water_level'] = self.water_level
+                    features['time_played'] = self.time_played
+                    # features['houses'] = self.houses
+                    # features['dinosaurs'] = self.dinosaurs
+                    # features['dinosaur'] = self.dinosaur
+                    features['dinosaurs_placed'] = self.dinosaurs_placed
+                    features['house.size'] = self.house_size
+                    features['house.position'] = self.house_position
+
                     all_assessments.append(features)
 
             self.count_actions += len(session)
+            self.castles_placed += session['castles_placed'].sum()
+            self.molds += session['molds'].sum()
+            self.sand += session['sand'].sum()
+            self.filled += session['filled'].sum()
+            self.movie_id += session['movie_id'].sum()
+            self.options += session['options'].sum()
+            self.animals += session['animals'].sum()
+            self.round_target_size += session['round_target.size'].sum()
+            self.round_target_type += session['round_target.type'].sum()
+            self.round_target_animal += session['round_target.animal'].sum()
+            self.item_type += session['item_type'].sum()
+            self.position += session['position'].sum()
+            self.animal += session['animal'].sum()
+            self.correct += session['correct'].sum()
+            self.misses += session['misses'].sum()
+            self.holding_shell += session['holding_shell'].sum()
+            self.has_water += session['has_water'].sum()
+            self.shells += session['shells'].sum()
+            self.holes += session['holes'].sum()
+            self.shell_size += session['shell_size'].sum()
+            self.hole_position += session['hole_position'].sum()
+            self.cloud += session['cloud'].sum()
+            self.cloud_size += session['cloud_size'].sum()
+            self.water_level += session['water_level'].sum()
+            self.time_played += session['time_played'].sum()
+            # self.houses += session['houses'].sum()
+            # self.dinosaurs += session['dinosaurs'].sum()
+            # self.dinosaur += session['dinosaur']
+            self.dinosaurs_placed += session['dinosaurs_placed'].sum()
+            self.house_size += session['house.size'].sum()
+            self.house_position += session['house.position'].sum()
 
             # second_conditionがFalseのときは、user_activities_countのみ増える。
             if self.last_activity != session_type:

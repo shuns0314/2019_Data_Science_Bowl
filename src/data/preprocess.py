@@ -51,6 +51,8 @@ def preprocess(train_df: pd.DataFrame,
     train_df['timestamp'] = pd.to_datetime(train_df['timestamp'])
     test_df['timestamp'] = pd.to_datetime(test_df['timestamp'])
 
+    del train_labels_df
+
     train_df, test_df = extract_event_code(train_df, test_df)
 
     compile_history = CompileHistory(win_code=win_code)

@@ -62,7 +62,7 @@ def extract_event_code(train_df, test_df) -> Tuple[pd.DataFrame, pd.DataFrame]:
     extracted_test['source'] = extracted_test['source'].astype(np.str)
     extracted_train, extracted_test = label_encode(
         extracted_train, extracted_test, 'source')
-    
+
     train_df = pd.concat([train_df, extracted_train], axis=1)
     test_df = pd.concat([test_df, extracted_test], axis=1)
 
