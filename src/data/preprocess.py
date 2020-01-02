@@ -7,6 +7,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from src.features.make_feature import GetData
+from src.features.event_code_features import extract_event_code
 
 
 parser = argparse.ArgumentParser()
@@ -21,10 +22,12 @@ def main():
     """main."""
     args = parser.parse_args()
     if args.debug is True:
-        nrows = 10000
-        print("DEBUG MODE: rows=10000")
+        nrows = 100000
+        print(f"DEBUG MODE: rows={nrows}")
     else:
         nrows = None
+        print("non debug")
+    print("--read csv--")
     train_df = pd.read_csv(f"{RAW_PATH}/train.csv", nrows=nrows)
     test_df = pd.read_csv(f"{RAW_PATH}/test.csv", nrows=nrows)
     train_labels_df = pd.read_csv(f"{RAW_PATH}/train_labels.csv", nrows=nrows)
@@ -47,6 +50,8 @@ def preprocess(train_df: pd.DataFrame,
 
     train_df['timestamp'] = pd.to_datetime(train_df['timestamp'])
     test_df['timestamp'] = pd.to_datetime(test_df['timestamp'])
+
+    train_df, test_df = extract_event_code(train_df, test_df)
 
     compile_history = CompileHistory(win_code=win_code)
     compiled_train = compile_history.compile_history_data(train_df)
