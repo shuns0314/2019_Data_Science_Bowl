@@ -53,8 +53,6 @@ def preprocess(train_df: pd.DataFrame,
 
     del train_labels_df
 
-    train_df, test_df = extract_event_code(train_df, test_df)
-
     compile_history = CompileHistory(win_code=win_code)
     compiled_train = compile_history.compile_history_data(train_df)
 

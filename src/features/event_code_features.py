@@ -6,21 +6,76 @@ import numpy as np
 from sklearn.preprocessing import LabelEncoder
 
 
-def extract_event_code(train_df, test_df) -> Tuple[pd.DataFrame, pd.DataFrame]:
-    print('--extract_event_code--')
-    drop_columns = [
-        'event_code',
-        'event_count',
-        'game_time',
+little_columns = {
+    'version',
+    'castles_placed',
+    'molds', 'sand', 'filled', 'movie_id', 'options',
+    'animals', 'round_target.size', 'round_target.type', 'round_target.animal',
+    'item_type', 'position', 'animal', 'correct',
+    'misses', 'holding_shell', 'has_water', 'shells', 'holes',
+    'shell_size', 'hole_position', 'cloud', 'cloud_size',
+    'water_level', 'time_played', 'houses', 'dinosaurs',
+    'dinosaur', 'dinosaurs_placed', 'house.size', 'house.position',
+    'rocket', 'height', 'launched', 'flowers', 'flower',
+    'growth', 'stumps', 'destination', 'session_duration',
+    'exit_type', 'distance', 'target_distances',
+    'round_prompt', 'target_size', 'resources', 'object_type',
+    'group', 'bug', 'buglength', 'stage_number', 'hat',
+    'caterpillar', 'hats', 'caterpillars', 'bird_height', 'target_containers', 'container_type',
+    'containers', 'current_containers', 'total_containers', 'toy_earned', 'object', 'previous_jars', 'bottles',
+    'bottle.amount', 'bottle.color', 'jar', 'jar_filled', 'tutorial_step', 'hats_placed',
+    'toy', 'diet', 'target_weight', 'weight', 'scale_weight', 'scale_contents',
+    'target_water_level', 'buckets', 'target_bucket', 'mode', 'prompt', 'round_number',
+    'bucket', 'buckets_placed', 'cauldron', 'layout.left.chickens',
+    'layout.left.pig', 'layout.right.chickens', 'layout.right.pig', 'side',
+}
+
+
+def extract_small_feature(data, i):
+    event_data = pd.io.json.json_normalize(data.event_data.apply(json.loads))
+    event_data['coordinates'] = event_data['coordinates.stage_height'].astype(np.str) + event_data['coordinates.stage_width'].astype(np.str)
+    event_data = event_data.drop(
+        ['coordinates.stage_height', 'coordinates.stage_width'], axis=1)
+    event_data['source'] = event_data['source'].astype(np.str)
+
+    learge_df = event_data[
+        ['description', 'identifier', 'media_type', 'coordinates', 'source']
         ]
-    print('---extract_train---')
-    extracted_train = pd.io.json.json_normalize(train_df.event_data.apply(json.loads))
-    extracted_train = extracted_train.drop(drop_columns, axis=1)
-    extracted_train_columns = set(extracted_train.columns)
+
+    zero_df = pd.DataFrame(
+        np.zeros([event_data.shape[0], len(little_columns)]),
+        columns=little_columns, dtype=np.uint8)
+    columns = little_columns & set(event_data.columns)
+    zero_df.loc[:, columns] = np.where(
+        event_data[columns].isna().values, np.uint8(0), np.uint8(1)
+        ).astype(np.uint8)
+
+    extract_df = pd.concat([zero_df, learge_df])
+    return extract_df, i
+
+
+def extract_event_data(train_event, test_event) -> Tuple[pd.DataFrame, pd.DataFrame]:
+
     print('---extract_test---')
-    extracted_test = pd.io.json.json_normalize(test_df.event_data.apply(json.loads))
-    extracted_test = extracted_test.drop(drop_columns, axis=1)
+    extracted_train = extract_small_feature(train_event)
+    extracted_test = extract_small_feature(test_event)
+
+    extracted_train = Parallel(n_jobs=-1)(
+             [delayed(extract_small_feature)(data, i) for i, data in enumerate(extracted_train)]
+             )
+    extracted_train.sort(key=lambda x: x[0])
+    extracted_train = [t[1] for t in extracted_train]
+
+    extracted_test = Parallel(n_jobs=-1)(
+             [delayed(extract_small_feature)(data, i) for i, data in enumerate(extracted_test)]
+             )
+    extracted_test.sort(key=lambda x: x[0])
+    extracted_test = [t[1] for t in extracted_test]
+
+
+    extracted_train_columns = set(extracted_train.columns)
     extracted_test_columns = set(extracted_test.columns)
+
     total_columns = list(extracted_train_columns.intersection(extracted_test_columns))
 
     extracted_train = extracted_train[total_columns]
@@ -28,16 +83,8 @@ def extract_event_code(train_df, test_df) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     assert len(extracted_train) == len(extracted_test), f'extracted_train: {len(extracted_train)}, extracted_test: {len(extracted_test)}'
 
-    # 10%以下しか存在しないcolumnを取り出す
-    little_column = extracted_train.count()[extracted_train.count() < len(train_df)/10].index
-
-    # nan値なら0, それ以外なら1とする。
-    extracted_train.loc[:, little_column] = np.where(
-        extracted_train[little_column].isna().values, 0, 1)
-    extracted_test.loc[:, little_column] = np.where(
-        extracted_test[little_column].isna().values, 0, 1)
-
     print('---label_encoding---')
+
     # label_encodeing
     extracted_train, extracted_test = label_encode(
         extracted_train, extracted_test, 'description')
@@ -48,27 +95,16 @@ def extract_event_code(train_df, test_df) -> Tuple[pd.DataFrame, pd.DataFrame]:
     extracted_train, extracted_test = label_encode(
         extracted_train, extracted_test, 'media_type')
 
-    extracted_train['coordinates'] = extracted_train['coordinates.stage_height'].astype(np.str) + extracted_train['coordinates.stage_width'].astype(np.str)
-    extracted_test['coordinates'] = extracted_test['coordinates.stage_height'].astype(np.str) + extracted_test['coordinates.stage_width'].astype(np.str)
-
     extracted_train, extracted_test = label_encode(
         extracted_train, extracted_test, 'coordinates')
-    extracted_train = extracted_train.drop(
-        ['coordinates.stage_height', 'coordinates.stage_width'], axis=1)
-    extracted_test = extracted_test.drop(
-        ['coordinates.stage_height', 'coordinates.stage_width'], axis=1)
 
-    extracted_train['source'] = extracted_train['source'].astype(np.str)
-    extracted_test['source'] = extracted_test['source'].astype(np.str)
     extracted_train, extracted_test = label_encode(
         extracted_train, extracted_test, 'source')
 
-    train_df = pd.concat([train_df, extracted_train], axis=1)
-    test_df = pd.concat([test_df, extracted_test], axis=1)
-
     print(extracted_test.columns)
     assert len(extracted_train.columns) == len(extracted_test.columns), f'extracted_train not equal extracted_test.'
-    return train_df, test_df
+
+    return extracted_train, extracted_test
 
 
 def label_encode(extracted_event_train, extracted_event_test, column):
@@ -79,8 +115,4 @@ def label_encode(extracted_event_train, extracted_event_test, column):
     le_dict = dict(zip(labelencoder.classes_, labelencoder.transform(labelencoder.classes_)))
     extracted_event_train[column] = extracted_event_train[column].apply(lambda x: le_dict.get(x, -1))
     extracted_event_test[column] = extracted_event_test[column].apply(lambda x: le_dict.get(x, -1))
-    # extracted_event_train[column] = labelencoder.transform(
-    #     extracted_event_train[column].values)
-    # extracted_event_test[column] = labelencoder.transform(
-    #     extracted_event_test[column].values)
     return extracted_event_train, extracted_event_test

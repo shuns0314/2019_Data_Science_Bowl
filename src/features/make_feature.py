@@ -161,6 +161,66 @@ class GetData():
         return all_assessments
 
 
+class GetData():
+    """各installation_idのおける過去のゲームの実績をまとめるmethod."""
+
+    def __init__(self, win_code, test_set=False):
+        self.win_code = win_code
+        self.user_activities_count = {
+            'Clip': 0,
+            'Activity': 0,
+            'Assessment': 0,
+            'Game': 0
+            }
+        self.last_activity = 0
+        self.test_set = test_set
+        self.count_actions = 0
+
+
+    def process(self, user_sample, installation_id):
+        all_assessments = []
+
+        get_assesments = GetAssessmentFeature(self.win_code,
+                                              test_set=self.test_set)
+
+        # まずgame_sessionでgroupbyする
+        for i, session in user_sample.groupby('game_session', sort=False):
+            session_type = session['type'].iloc[0]
+
+            # session数が1以下を省く
+            if self.test_set is True:
+                second_condition = True
+            else:
+                if len(session) > 1:
+                    second_condition = True
+                else:
+                    second_condition = False
+
+            features: dict = self.user_activities_count.copy()
+
+            # session typeがAssessmentのやつだけ、カウントする。
+            if (session_type == 'Assessment') & (second_condition):
+                features = get_assesments.process(session, features)
+
+                if features is not None:
+                    features['installation_id'] = installation_id
+                    # 特徴量に前回までのゲームの回数を追加
+                    features['count_actions'] = self.count_actions
+
+                    all_assessments.append(features)
+
+            self.count_actions += len(session)
+
+            # second_conditionがFalseのときは、user_activities_countのみ増える。
+            if self.last_activity != session_type:
+                self.user_activities_count[session_type] += 1
+                self.last_activitiy = session_type
+
+        if self.test_set:
+            return all_assessments[-1]
+        return all_assessments
+
+
 class GetAssessmentFeature:
 
     def __init__(self, win_code, test_set=False):
