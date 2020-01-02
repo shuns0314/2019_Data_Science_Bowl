@@ -3,20 +3,12 @@ import pandas as pd
 import numpy as np
 
 
-class GetData():
+class GetEventData():
     """各installation_idのおける過去のゲームの実績をまとめるmethod."""
 
     def __init__(self, win_code, test_set=False):
         self.win_code = win_code
-        self.user_activities_count = {
-            'Clip': 0,
-            'Activity': 0,
-            'Assessment': 0,
-            'Game': 0
-            }
-        self.last_activity = 0
         self.test_set = test_set
-        self.count_actions = 0
 
         # event_data
         self.version = 0
@@ -56,9 +48,6 @@ class GetData():
     def process(self, user_sample, installation_id):
         all_assessments = []
 
-        get_assesments = GetAssessmentFeature(self.win_code,
-                                              test_set=self.test_set)
-
         # まずgame_sessionでgroupbyする
         for i, session in user_sample.groupby('game_session', sort=False):
             session_type = session['type'].iloc[0]
@@ -72,16 +61,13 @@ class GetData():
                 else:
                     second_condition = False
 
-            features: dict = self.user_activities_count.copy()
+            features = dict()
 
             # session typeがAssessmentのやつだけ、カウントする。
             if (session_type == 'Assessment') & (second_condition):
-                features = get_assesments.process(session, features)
 
                 if features is not None:
                     features['installation_id'] = installation_id
-                    # 特徴量に前回までのゲームの回数を追加
-                    features['count_actions'] = self.count_actions
 
                     features['version'] = self.version
                     features['castles_placed'] = self.castles_placed
@@ -118,7 +104,6 @@ class GetData():
 
                     all_assessments.append(features)
 
-            self.count_actions += len(session)
             self.castles_placed += session['castles_placed'].sum()
             self.molds += session['molds'].sum()
             self.sand += session['sand'].sum()
@@ -150,11 +135,6 @@ class GetData():
             self.dinosaurs_placed += session['dinosaurs_placed'].sum()
             self.house_size += session['house.size'].sum()
             self.house_position += session['house.position'].sum()
-
-            # second_conditionがFalseのときは、user_activities_countのみ増える。
-            if self.last_activity != session_type:
-                self.user_activities_count[session_type] += 1
-                self.last_activitiy = session_type
 
         if self.test_set:
             return all_assessments[-1]

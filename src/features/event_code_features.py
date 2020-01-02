@@ -4,6 +4,7 @@ from typing import Tuple
 import pandas as pd
 import numpy as np
 from sklearn.preprocessing import LabelEncoder
+from joblib import Parallel, delayed
 
 
 little_columns = {
@@ -32,6 +33,7 @@ little_columns = {
 
 
 def extract_small_feature(data, i):
+    stash_data = data[["installation_id", 'game_session', 'type']]
     event_data = pd.io.json.json_normalize(data.event_data.apply(json.loads))
     event_data['coordinates'] = event_data['coordinates.stage_height'].astype(np.str) + event_data['coordinates.stage_width'].astype(np.str)
     event_data = event_data.drop(
@@ -50,40 +52,43 @@ def extract_small_feature(data, i):
         event_data[columns].isna().values, np.uint8(0), np.uint8(1)
         ).astype(np.uint8)
 
-    extract_df = pd.concat([zero_df, learge_df])
+    extract_df = pd.concat([zero_df, learge_df], axis=1)
+    extract_df = pd.concat([extract_df, stash_data], axis=1)
     return extract_df, i
 
 
 def extract_event_data(train_event, test_event) -> Tuple[pd.DataFrame, pd.DataFrame]:
 
     print('---extract_test---')
-    extracted_train = extract_small_feature(train_event)
-    extracted_test = extract_small_feature(test_event)
-
     extracted_train = Parallel(n_jobs=-1)(
-             [delayed(extract_small_feature)(data, i) for i, data in enumerate(extracted_train)]
+             [delayed(extract_small_feature)(data, i) for i, data in enumerate(train_event)]
              )
-    extracted_train.sort(key=lambda x: x[0])
-    extracted_train = [t[1] for t in extracted_train]
+    extracted_train.sort(key=lambda x: x[1])
+    extracted_train = [t[0] for t in extracted_train]
+    extracted_train = pd.concat(extracted_train)
+    
+    del train_event
 
     extracted_test = Parallel(n_jobs=-1)(
-             [delayed(extract_small_feature)(data, i) for i, data in enumerate(extracted_test)]
+             [delayed(extract_small_feature)(data, i) for i, data in enumerate(test_event)]
              )
-    extracted_test.sort(key=lambda x: x[0])
-    extracted_test = [t[1] for t in extracted_test]
+    extracted_test.sort(key=lambda x: x[1])
+    extracted_test = [t[0] for t in extracted_test]
+    extracted_test = pd.concat(extracted_test)
 
+    del test_event
 
     extracted_train_columns = set(extracted_train.columns)
     extracted_test_columns = set(extracted_test.columns)
 
-    total_columns = list(extracted_train_columns.intersection(extracted_test_columns))
+    total_columns = list(
+        extracted_train_columns.intersection(extracted_test_columns)
+        )
 
     extracted_train = extracted_train[total_columns]
     extracted_test = extracted_test[total_columns]
 
     assert len(extracted_train) == len(extracted_test), f'extracted_train: {len(extracted_train)}, extracted_test: {len(extracted_test)}'
-
-    print('---label_encoding---')
 
     # label_encodeing
     extracted_train, extracted_test = label_encode(
@@ -92,14 +97,14 @@ def extract_event_data(train_event, test_event) -> Tuple[pd.DataFrame, pd.DataFr
     extracted_train, extracted_test = label_encode(
         extracted_train, extracted_test, 'identifier')
 
-    extracted_train, extracted_test = label_encode(
-        extracted_train, extracted_test, 'media_type')
+    # extracted_train, extracted_test = label_encode(
+    #     extracted_train, extracted_test, 'media_type')
 
-    extracted_train, extracted_test = label_encode(
-        extracted_train, extracted_test, 'coordinates')
+    # extracted_train, extracted_test = label_encode(
+    #     extracted_train, extracted_test, 'coordinates')
 
-    extracted_train, extracted_test = label_encode(
-        extracted_train, extracted_test, 'source')
+    # extracted_train, extracted_test = label_encode(
+    #     extracted_train, extracted_test, 'source')
 
     print(extracted_test.columns)
     assert len(extracted_train.columns) == len(extracted_test.columns), f'extracted_train not equal extracted_test.'
@@ -108,10 +113,15 @@ def extract_event_data(train_event, test_event) -> Tuple[pd.DataFrame, pd.DataFr
 
 
 def label_encode(extracted_event_train, extracted_event_test, column):
+    print(f'---label_encoding({column})---')
     labelencoder = LabelEncoder()
-    extracted_event_train[column] = extracted_event_train[column].apply(lambda x: 'nan' if x is np.NaN else x)
-    extracted_event_test[column] = extracted_event_test[column].apply(lambda x: 'nan' if x is np.NaN else x)
+    extracted_event_train[column] = extracted_event_train[column].astype(np.str)
+    extracted_event_test[column] = extracted_event_test[column].astype(np.str)
+
+    print(f'1')
+    print(extracted_event_train[column].values)
     labelencoder.fit(extracted_event_train[column].values)
+    print(f'2')
     le_dict = dict(zip(labelencoder.classes_, labelencoder.transform(labelencoder.classes_)))
     extracted_event_train[column] = extracted_event_train[column].apply(lambda x: le_dict.get(x, -1))
     extracted_event_test[column] = extracted_event_test[column].apply(lambda x: le_dict.get(x, -1))

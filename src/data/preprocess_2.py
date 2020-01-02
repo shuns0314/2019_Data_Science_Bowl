@@ -7,7 +7,7 @@ import pandas as pd
 import numpy as np
 from joblib import Parallel, delayed
 
-from src.features.make_feature import GetData
+from src.features.make_feature import GetData, GetEventData
 from src.features.event_code_features import extract_event_data
 
 
@@ -39,6 +39,15 @@ def preprocess(train_df: pd.DataFrame,
                test_df: pd.DataFrame,
                train_labels_df: pd.DataFrame):
     """前処理のメイン関数."""
+    args = parser.parse_args()
+    if args.debug is True:
+        nrows = 100000
+        print(f"DEBUG MODE: rows={nrows}")
+    else:
+        nrows = None
+        print("non debug")
+    
+
     activities_map = encode_title(train_df, test_df)
     assert len(activities_map) == 44, f'想定値: 44, 入力値: {len(activities_map)}'
 
@@ -60,25 +69,28 @@ def preprocess(train_df: pd.DataFrame,
     compile_history = CompileHistory(win_code=win_code, test_set=True)
     compiled_test = compile_history.compile_history_data(test_df)
 
-    del train_df, test_df, win_code
+    del train_df, test_df
     gc.collect()
 
     train_event_data = pd.read_csv(f"{RAW_PATH}/train.csv",
-                                   usecols=['event_data', 'installation_id', 'game_session'],
-                                   chunksize=10000)
+                                   usecols=['event_data', 'installation_id', 'game_session', 'type'],
+                                   chunksize=10000,
+                                   nrows=nrows)
     test_event_data = pd.read_csv(f"{RAW_PATH}/test.csv",
-                                  usecols=['event_data', 'installation_id', 'game_session'],
-                                  chunksize=10000)
+                                  usecols=['event_data', 'installation_id', 'game_session', 'type'],
+                                  chunksize=10000,
+                                  nrows=nrows)
 
     train_event_data, test_event_data = extract_event_data(
         train_event_data, test_event_data)
-
+    print(train_event_data.installation_id)
     compile_history = CompileHistory(win_code=win_code)
-    compiled_train = compile_history.compile_history_data(train_event_data)
+    compiled_train = compile_history.compile_history_data(
+        train_event_data, is_event_data=True)
 
     compile_history = CompileHistory(win_code=win_code, test_set=True)
-    compiled_test = compile_history.compile_history_data(test_df)
-
+    compiled_test = compile_history.compile_history_data(
+        test_event_data, is_event_data=True)
 
     now = datetime.now().strftime('%Y%m%d_%H%M%S')
     compiled_train.to_csv(f'/code/data/processed/proceeded_train_{now}.csv')
@@ -129,9 +141,14 @@ class CompileHistory:
         self.test_set = test_set
 
     def compile_history_data(self,
-                             df: pd.DataFrame) -> pd.DataFrame:
+                             df: pd.DataFrame,
+                             is_event_data: bool = False) -> pd.DataFrame:
         """過去のデータを、installation_idごとのデータにまとめる."""
-        get_data = GetData(win_code=self.win_code, test_set=self.test_set)
+        if is_event_data:
+            get_data = GetEventData(win_code=self.win_code, test_set=self.test_set)
+        else:
+            get_data = GetData(win_code=self.win_code, test_set=self.test_set)
+
         compiled_data = Parallel(n_jobs=-1)(
             [delayed(self.get_data_for_sort)(
                 user_sample, i, get_data, installation_id
