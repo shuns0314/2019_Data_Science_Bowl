@@ -38,7 +38,7 @@ class GetData():
         self.event_code_count: Dict[str, int] = {ev: 0 for ev in self.list_of_event_code}
         self.event_id_count: Dict[str, int] = {eve: 0 for eve in self.list_of_event_id}
         self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
-        self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
+        # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
 
     def process(self, user_sample, installation_id):
 
@@ -77,7 +77,7 @@ class GetData():
                     features.update(self.event_code_count.copy())
                     features.update(self.event_id_count.copy())
                     features.update(self.title_count.copy())
-                    features.update(self.title_event_code_count.copy())
+                    # features.update(self.title_event_code_count.copy())
 
                     all_assessments.append(features)
 
@@ -88,8 +88,8 @@ class GetData():
                 session, self.event_id_count, "event_id")
             self.title_count = self.update_counters(
                 session, self.title_count, 'title')
-            self.title_event_code_count = self.update_counters(
-                session, self.title_event_code_count, 'title_event_code')
+            # self.title_event_code_count = self.update_counters(
+            #     session, self.title_event_code_count, 'title_event_code')
 
             # second_conditionがFalseのときは、user_activities_countのみ増える。
             if self.last_activity != session_type:
@@ -156,6 +156,9 @@ class GetAssessmentFeature:
         session_title_text = self.activities_labels[session_title]
         # 特徴量に前回までの正解数と失敗数追加
         features = self.add_count_attempts(features, all_attempts)
+
+        # 特徴量に前回までのcoolとgreatの数を追加
+        # features = self.add_count_identifier(features, all_attempts)
 
         # 特徴量に前回までのaccuracyを追加
         count_acc = self.count_accuracy/self.counter if self.counter > 0 else 0

@@ -140,10 +140,6 @@ def make_event_code(activities_map: dict):
     return win_code
 
 
-def make_unique_list(train_series: pd.Series, test_series: pd.Series):
-    return list(set(train_series.unique()).union(set(test_series.unique())))
-
-
 class CompileHistory:
     def __init__(self,
                  win_code,
@@ -175,7 +171,7 @@ class CompileHistory:
             all_title_event_code=self.all_title_event_code,
             test_set=self.test_set,
             )
-        compiled_data = Parallel(n_jobs=-1)(
+        compiled_data = Parallel(n_jobs=-1, verbose=10)(
             [delayed(self.get_data_for_sort)(
                 user_sample, i, get_data, installation_id
                 ) for i, (installation_id, user_sample) in enumerate(
