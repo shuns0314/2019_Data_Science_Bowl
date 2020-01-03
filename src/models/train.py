@@ -35,12 +35,12 @@ def main():
         os.makedirs(f'models/{args.name}')
 
     if args.test_csv == 'None':
-        model, params, pred_df = lgb_regression(train_df)
+        model, all_importance, pred_df = lgb_regression(train_df)
     else:
         coefficient = train_df['accuracy_group'].value_counts(sort=False)/len(train_df['accuracy_group'])
         test_df = pd.read_csv(f"data/processed/{args.test_csv}.csv", index_col=0)
-        model, params, pred_df = lgb_regression(train_df, test_df)
-        print(params)
+        model, all_importance, pred_df = lgb_regression(train_df, test_df)
+        all_importance.to_csv(f'models/{args.name}/all_importance.csv')
         pred_df.to_csv(f'models/{args.name}/check_cv.csv')
         pred_df = pred_df.apply(lambda x: x.mode()[0] if len(x.mode()) == 1 else coefficient[x.mode()].idxmax(), axis=1)
         pred_df.to_csv(f'models/{args.name}/submission.csv', header=False)
@@ -49,8 +49,8 @@ def main():
     joblib.dump(model, f'models/{args.name}/model_{args.name}.pkl')
 
     # paramsのsave
-    with open(f'models/{args.name}/params_{args.name}.pkl', 'wb') as handle:
-        pickle.dump(params, handle)
+    # with open(f'models/{args.name}/params_{args.name}.pkl', 'wb') as handle:
+    #     pickle.dump(params, handle)
 
 
 def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.DataFrame:
@@ -77,7 +77,7 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         total_test_pred = np.zeros([test_df.shape[0], num_fold])
         print(total_test_pred.shape)
 
-    all_params = []
+    all_importance = []
 
     for fold_ind, (train_ind, test_ind) in enumerate(
             stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=77)):
@@ -108,6 +108,7 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         # all_params.append(params)
 
         y_pred = model.predict(x_test, num_iteration=model.best_iteration)
+        all_importance.append(pd.DataFrame(model.feature_importance('gain'), index=x_train.columns))
         y_pred = func(y_pred, params)
         total_pred[test_ind] = y_pred
 
@@ -116,14 +117,15 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
                 test_x, num_iteration=model.best_iteration)
             test_pred = func(test_pred, params)
             total_test_pred[:, fold_ind] = test_pred
+    all_importance = pd.concat(all_importance, axis=1)
 
     loss = qwk(total_pred, y)
     print(f"val_loss: {loss}")
 
     if test_df is None:
-        return model, all_params
+        return model, all_importance
     else:
-        return model, all_params, pd.DataFrame(total_test_pred)
+        return model, all_importance, pd.DataFrame(total_test_pred)
 
 
 if __name__ == "__main__":
