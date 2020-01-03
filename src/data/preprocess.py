@@ -32,27 +32,70 @@ def main():
     preprocess(train_df, test_df, train_labels_df)
 
 
-def preprocess(train_df: pd.DataFrame,
-               test_df: pd.DataFrame,
-               train_labels_df: pd.DataFrame):
+def preprocess(train: pd.DataFrame,
+               test: pd.DataFrame,
+               train_labels: pd.DataFrame):
     """前処理のメイン関数."""
-    activities_map = encode_title(train_df, test_df)
-    assert len(activities_map) == 44, f'想定値: 44, 入力値: {len(activities_map)}'
+    train['title_event_code'] = list(map(lambda x, y: str(x) + '_' + str(y), train['title'], train['event_code']))
+    test['title_event_code'] = list(map(lambda x, y: str(x) + '_' + str(y), test['title'], test['event_code']))
+    all_title_event_code = list(set(train["title_event_code"].unique()).union(test["title_event_code"].unique()))
 
-    train_df['title'] = train_df['title'].map(activities_map)
-    test_df['title'] = test_df['title'].map(activities_map)
-    train_labels_df['title'] = train_labels_df['title'].map(activities_map)
-    win_code = make_event_code(activities_map)
-    assert len(win_code) == 44, f'想定値: 44, 入力値: {len(win_code)}'
+    list_of_user_activities = list(set(train['title'].unique()).union(set(test['title'].unique())))
+    # make a list with all the unique 'event_code' from the train and test set
+    list_of_event_code = list(set(train['event_code'].unique()).union(set(test['event_code'].unique())))
+    # print(list_of_event_code)
+    list_of_event_id = list(set(train['event_id'].unique()).union(set(test['event_id'].unique())))
+    # make a list with all the unique worlds from the train and test set
+    list_of_worlds = list(set(train['world'].unique()).union(set(test['world'].unique())))
+    # create a dictionary numerating the titles
+    activities_map = dict(zip(list_of_user_activities, np.arange(len(list_of_user_activities))))
+    activities_labels = dict(zip(np.arange(len(list_of_user_activities)), list_of_user_activities))
+    activities_world = dict(zip(list_of_worlds, np.arange(len(list_of_worlds))))
+    assess_titles = list(set(train[train['type'] == 'Assessment']['title'].value_counts().index).union(set(test[test['type'] == 'Assessment']['title'].value_counts().index)))
+    # replace the text titles with the number titles from the dict
+    train['title'] = train['title'].map(activities_map)
+    test['title'] = test['title'].map(activities_map)
+    train['world'] = train['world'].map(activities_world)
+    test['world'] = test['world'].map(activities_world)
+    train_labels['title'] = train_labels['title'].map(activities_map)
+    win_code = dict(zip(activities_map.values(), (4100*np.ones(len(activities_map))).astype('int')))
+    # then, it set one element, the 'Bird Measurer (Assessment)' as 4110, 10 more than the rest
+    win_code[activities_map['Bird Measurer (Assessment)']] = 4110
+    # convert text into datetime
+    train['timestamp'] = pd.to_datetime(train['timestamp'])
+    test['timestamp'] = pd.to_datetime(test['timestamp'])
+    print('title_column')
+    print(train.head())
+    print('asses_title')
+    print(assess_titles)
+    print('list_of_event_code')
+    print(list_of_event_code)
+    print('list_of_event_id')
+    print(list_of_event_id)
+    print('activities_labels')
+    print(activities_labels)
+    print('all_title_event_code')
+    print(all_title_event_code)
 
-    train_df['timestamp'] = pd.to_datetime(train_df['timestamp'])
-    test_df['timestamp'] = pd.to_datetime(test_df['timestamp'])
+    compile_history = CompileHistory(
+        win_code=win_code,
+        assess_titles=assess_titles,
+        list_of_event_code=list_of_event_code,
+        list_of_event_id=list_of_event_id,
+        activities_labels=activities_labels,
+        all_title_event_code=all_title_event_code
+        )
+    compiled_train = compile_history.compile_history_data(train)
 
-    compile_history = CompileHistory(win_code=win_code)
-    compiled_train = compile_history.compile_history_data(train_df)
-
-    compile_history = CompileHistory(win_code=win_code, test_set=True)
-    compiled_test = compile_history.compile_history_data(test_df)
+    compile_history = CompileHistory(
+        win_code=win_code,
+        assess_titles=assess_titles,
+        list_of_event_code=list_of_event_code,
+        list_of_event_id=list_of_event_id,
+        activities_labels=activities_labels,
+        all_title_event_code=all_title_event_code,
+        test_set=True)
+    compiled_test = compile_history.compile_history_data(test)
 
     now = datetime.now().strftime('%Y%m%d_%H%M%S')
     compiled_train.to_csv(f'/code/data/processed/proceeded_train_{now}.csv')
@@ -97,15 +140,41 @@ def make_event_code(activities_map: dict):
     return win_code
 
 
+def make_unique_list(train_series: pd.Series, test_series: pd.Series):
+    return list(set(train_series.unique()).union(set(test_series.unique())))
+
+
 class CompileHistory:
-    def __init__(self, win_code, test_set: bool = False):
+    def __init__(self,
+                 win_code,
+                 assess_titles,
+                 list_of_event_code,
+                 list_of_event_id,
+                 activities_labels,
+                 all_title_event_code,
+                 test_set: bool = False,):
+
         self.win_code = win_code
+        self.assess_titles = assess_titles
+        self.list_of_event_code = list_of_event_code
+        self.list_of_event_id = list_of_event_id
+        self.activities_labels = activities_labels
+        self.all_title_event_code = all_title_event_code
         self.test_set = test_set
 
     def compile_history_data(self,
                              df: pd.DataFrame) -> pd.DataFrame:
         """過去のデータを、installation_idごとのデータにまとめる."""
-        get_data = GetData(win_code=self.win_code, test_set=self.test_set)
+        print(self.list_of_event_code)
+        get_data = GetData(
+            win_code=self.win_code,
+            assess_titles=self.assess_titles,
+            list_of_event_code=self.list_of_event_code,
+            list_of_event_id=self.list_of_event_id,
+            activities_labels=self.activities_labels,
+            all_title_event_code=self.all_title_event_code,
+            test_set=self.test_set,
+            )
         compiled_data = Parallel(n_jobs=-1)(
             [delayed(self.get_data_for_sort)(
                 user_sample, i, get_data, installation_id
