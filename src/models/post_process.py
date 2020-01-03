@@ -19,7 +19,7 @@ def post_processing(y_test, y_pred):
         return loss
 
     study = optuna.create_study(direction='maximize')
-    study.optimize(objectives, n_trials=2)
+    study.optimize(objectives, n_trials=150)
 
     print(f'Number of finished trials: {len(study.trials)}')
 
