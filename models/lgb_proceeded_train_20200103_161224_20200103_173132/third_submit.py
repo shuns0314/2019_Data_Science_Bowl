@@ -14,27 +14,70 @@ import lightgbm as lgb
 RAW_PATH = "/code/data/raw"
 
 
-def preprocess(train_df: pd.DataFrame,
-               test_df: pd.DataFrame,
-               train_labels_df: pd.DataFrame):
+def preprocess(train: pd.DataFrame,
+               test: pd.DataFrame,
+               train_labels: pd.DataFrame):
     """前処理のメイン関数."""
-    activities_map = encode_title(train_df, test_df)
-    assert len(activities_map) == 44, f'想定値: 44, 入力値: {len(activities_map)}'
+    train['title_event_code'] = list(map(lambda x, y: str(x) + '_' + str(y), train['title'], train['event_code']))
+    test['title_event_code'] = list(map(lambda x, y: str(x) + '_' + str(y), test['title'], test['event_code']))
+    all_title_event_code = list(set(train["title_event_code"].unique()).union(test["title_event_code"].unique()))
 
-    train_df['title'] = train_df['title'].map(activities_map)
-    test_df['title'] = test_df['title'].map(activities_map)
-    train_labels_df['title'] = train_labels_df['title'].map(activities_map)
-    win_code = make_event_code(activities_map)
-    assert len(win_code) == 44, f'想定値: 44, 入力値: {len(win_code)}'
+    list_of_user_activities = list(set(train['title'].unique()).union(set(test['title'].unique())))
+    # make a list with all the unique 'event_code' from the train and test set
+    list_of_event_code = list(set(train['event_code'].unique()).union(set(test['event_code'].unique())))
+    # print(list_of_event_code)
+    list_of_event_id = list(set(train['event_id'].unique()).union(set(test['event_id'].unique())))
+    # make a list with all the unique worlds from the train and test set
+    list_of_worlds = list(set(train['world'].unique()).union(set(test['world'].unique())))
+    # create a dictionary numerating the titles
+    activities_map = dict(zip(list_of_user_activities, np.arange(len(list_of_user_activities))))
+    activities_labels = dict(zip(np.arange(len(list_of_user_activities)), list_of_user_activities))
+    activities_world = dict(zip(list_of_worlds, np.arange(len(list_of_worlds))))
+    assess_titles = list(set(train[train['type'] == 'Assessment']['title'].value_counts().index).union(set(test[test['type'] == 'Assessment']['title'].value_counts().index)))
+    # replace the text titles with the number titles from the dict
+    train['title'] = train['title'].map(activities_map)
+    test['title'] = test['title'].map(activities_map)
+    train['world'] = train['world'].map(activities_world)
+    test['world'] = test['world'].map(activities_world)
+    train_labels['title'] = train_labels['title'].map(activities_map)
+    win_code = dict(zip(activities_map.values(), (4100*np.ones(len(activities_map))).astype('int')))
+    # then, it set one element, the 'Bird Measurer (Assessment)' as 4110, 10 more than the rest
+    win_code[activities_map['Bird Measurer (Assessment)']] = 4110
+    # convert text into datetime
+    train['timestamp'] = pd.to_datetime(train['timestamp'])
+    test['timestamp'] = pd.to_datetime(test['timestamp'])
+    print('title_column')
+    print(train.head())
+    print('asses_title')
+    print(assess_titles)
+    print('list_of_event_code')
+    print(list_of_event_code)
+    print('list_of_event_id')
+    print(list_of_event_id)
+    print('activities_labels')
+    print(activities_labels)
+    print('all_title_event_code')
+    print(all_title_event_code)
 
-    train_df['timestamp'] = pd.to_datetime(train_df['timestamp'])
-    test_df['timestamp'] = pd.to_datetime(test_df['timestamp'])
+    compile_history = CompileHistory(
+        win_code=win_code,
+        assess_titles=assess_titles,
+        list_of_event_code=list_of_event_code,
+        list_of_event_id=list_of_event_id,
+        activities_labels=activities_labels,
+        all_title_event_code=all_title_event_code
+        )
+    compiled_train = compile_history.compile_history_data(train)
 
-    compile_history = CompileHistory(win_code=win_code)
-    compiled_train = compile_history.compile_history_data(train_df)
-
-    compile_history = CompileHistory(win_code=win_code, test_set=True)
-    compiled_test = compile_history.compile_history_data(test_df)
+    compile_history = CompileHistory(
+        win_code=win_code,
+        assess_titles=assess_titles,
+        list_of_event_code=list_of_event_code,
+        list_of_event_id=list_of_event_id,
+        activities_labels=activities_labels,
+        all_title_event_code=all_title_event_code,
+        test_set=True)
+    compiled_test = compile_history.compile_history_data(test)
 
     return compiled_train, compiled_test
 
@@ -80,8 +123,22 @@ def make_event_code(activities_map: dict):
 class GetData():
     """各installation_idのおける過去のゲームの実績をまとめるmethod."""
 
-    def __init__(self, win_code, test_set=False):
+    def __init__(self,
+                 win_code,
+                 assess_titles,
+                 list_of_event_code,
+                 list_of_event_id,
+                 activities_labels,
+                 all_title_event_code,
+                 test_set=False):
+
         self.win_code = win_code
+        self.assess_titles = assess_titles
+        self.list_of_event_code = list_of_event_code
+        self.list_of_event_id = list_of_event_id
+        self.activities_labels = activities_labels
+        self.all_title_event_code = all_title_event_code
+
         self.user_activities_count = {
             'Clip': 0,
             'Activity': 0,
@@ -92,17 +149,27 @@ class GetData():
         self.test_set = test_set
         self.count_actions = 0
 
+        # print(self.list_of_event_code)
+        self.event_code_count: Dict[str, int] = {ev: 0 for ev in self.list_of_event_code}
+        self.event_id_count: Dict[str, int] = {eve: 0 for eve in self.list_of_event_id}
+        self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
+        self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
+
     def process(self, user_sample, installation_id):
+
         all_assessments = []
-
         get_assesments = GetAssessmentFeature(self.win_code,
+                                              self.assess_titles,
+                                              self.list_of_event_code,
+                                              self.list_of_event_id,
+                                              self.activities_labels,
+                                              self.all_title_event_code,
                                               test_set=self.test_set)
-
         # まずgame_sessionでgroupbyする
         for i, session in user_sample.groupby('game_session', sort=False):
             session_type = session['type'].iloc[0]
-
-            # session数が1以下を省く
+            # print(session_type)
+            # game_session数が1以下を省く
             if self.test_set is True:
                 second_condition = True
             else:
@@ -121,9 +188,23 @@ class GetData():
                     features['installation_id'] = installation_id
                     # 特徴量に前回までのゲームの回数を追加
                     features['count_actions'] = self.count_actions
+
+                    features.update(self.event_code_count.copy())
+                    features.update(self.event_id_count.copy())
+                    features.update(self.title_count.copy())
+                    features.update(self.title_event_code_count.copy())
+
                     all_assessments.append(features)
 
             self.count_actions += len(session)
+            self.event_code_count = self.update_counters(
+                session, self.event_code_count, "event_code")
+            self.event_id_count = self.update_counters(
+                session, self.event_id_count, "event_id")
+            self.title_count = self.update_counters(
+                session, self.title_count, 'title')
+            self.title_event_code_count = self.update_counters(
+                session, self.title_event_code_count, 'title_event_code')
 
             # second_conditionがFalseのときは、user_activities_countのみ増える。
             if self.last_activity != session_type:
@@ -134,11 +215,34 @@ class GetData():
             return all_assessments[-1]
         return all_assessments
 
+    def update_counters(self, session, counter: dict, col: str):
+        num_of_session_count = Counter(session[col])
+        for k in num_of_session_count.keys():
+            x = k
+            if col == 'title':
+                x = self.activities_labels[k]
+            counter[x] += num_of_session_count[k]
+        return counter
+
 
 # make_feature
 class GetAssessmentFeature:
 
-    def __init__(self, win_code, test_set=False):
+    def __init__(self,
+                 win_code,
+                 assess_titles,
+                 list_of_event_code,
+                 list_of_event_id,
+                 activities_labels,
+                 all_title_event_code,
+                 test_set=False):
+
+        self.list_of_event_code = list_of_event_code
+        self.list_of_event_id = list_of_event_id
+        self.activities_labels = activities_labels
+        self.all_title_event_code = all_title_event_code
+        self.assess_titles = assess_titles
+
         self.test_set = test_set
         self.win_code = win_code
         self.accuracy_groups = {0: 0, 1: 0, 2: 0, 3: 0}
@@ -151,6 +255,11 @@ class GetAssessmentFeature:
         self.true_attempts = 0
         self.false_attempts = 0
 
+        self.last_accuracy_title = {'acc_' + title: -1 for title in assess_titles}
+
+        self.so_cool = 0
+        self.greatjob = 0
+
     def process(self, session, features):
         all_attempts = session.query(
                 f"event_code == {self.win_code[session['title'].iloc[0]]}"
@@ -158,7 +267,9 @@ class GetAssessmentFeature:
         assert type(all_attempts) == pd.DataFrame
 
         features['session_title'] = session['title'].iloc[0]
-
+        session_title = session['title'].iloc[0]
+        # print(self.activities_labels[session_title])
+        session_title_text = self.activities_labels[session_title]
         # 特徴量に前回までの正解数と失敗数追加
         features = self.add_count_attempts(features, all_attempts)
 
@@ -167,6 +278,10 @@ class GetAssessmentFeature:
         features['count_accuracy'] = count_acc
         accuracy = self.calc_accuracy(self.true_attempts, self.false_attempts)
         self.count_accuracy += accuracy
+
+        features.update(self.last_accuracy_title.copy())
+        # print(accuracy)
+        self.last_accuracy_title['acc_' + session_title_text] = accuracy
 
         # 特徴量に前回までの平均ゲーム時間を追加
         features = self.add_duration_mean(features, session)
@@ -244,15 +359,37 @@ class GetAssessmentFeature:
 
 
 class CompileHistory:
-    def __init__(self, win_code, test_set: bool = False):
+    def __init__(self,
+                 win_code,
+                 assess_titles,
+                 list_of_event_code,
+                 list_of_event_id,
+                 activities_labels,
+                 all_title_event_code,
+                 test_set: bool = False,):
+
         self.win_code = win_code
+        self.assess_titles = assess_titles
+        self.list_of_event_code = list_of_event_code
+        self.list_of_event_id = list_of_event_id
+        self.activities_labels = activities_labels
+        self.all_title_event_code = all_title_event_code
         self.test_set = test_set
 
     def compile_history_data(self,
                              df: pd.DataFrame) -> pd.DataFrame:
         """過去のデータを、installation_idごとのデータにまとめる."""
-        get_data = GetData(win_code=self.win_code, test_set=self.test_set)
-        compiled_data = Parallel(n_jobs=-1)(
+        print(self.list_of_event_code)
+        get_data = GetData(
+            win_code=self.win_code,
+            assess_titles=self.assess_titles,
+            list_of_event_code=self.list_of_event_code,
+            list_of_event_id=self.list_of_event_id,
+            activities_labels=self.activities_labels,
+            all_title_event_code=self.all_title_event_code,
+            test_set=self.test_set,
+            )
+        compiled_data = Parallel(n_jobs=-1, verbose=10)(
             [delayed(self.get_data_for_sort)(
                 user_sample, i, get_data, installation_id
                 ) for i, (installation_id, user_sample) in enumerate(
@@ -275,6 +412,19 @@ class CompileHistory:
         compiled_data = get_data.process(data, installation_id)
         # print(f"compiled_data: {compiled_data}")
         return compiled_data, i
+
+
+def lgb_qwk(preds, data):
+    params = {
+        'threshold_0': 1.12,
+        'threshold_1': 1.62,
+        'threshold_2': 2.20
+        },
+
+    func = np.frompyfunc(threshold, 2, 1)
+    test_pred = func(preds, params)
+    loss = qwk(test_pred, data.get_label())
+    return 'qwk', loss, True
 
 
 def qwk(a1, a2):
@@ -418,7 +568,7 @@ def threshold(x, params):
 # train
 def train_main(train_df, test_df):
     """main."""
-    _, _, pred_df = lgb_regression(train_df, test_df)
+    _, pred_df = lgb_regression(train_df, test_df)
     coefficient = train_df['accuracy_group'].value_counts(sort=False)/len(train_df['accuracy_group'])
     print(coefficient)
     pred_df = pred_df.apply(lambda x: x.mode()[0] if len(x.mode()) == 1 else coefficient[x.mode()].idxmax(), axis=1)
@@ -449,31 +599,38 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         total_test_pred = np.zeros([test_df.shape[0], num_fold])
         print(total_test_pred.shape)
 
-    all_params = []
+    all_importance = []
 
-    for fold_ind, (train_ind, val_ind, test_ind) in enumerate(
+    for fold_ind, (train_ind, test_ind) in enumerate(
             stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=77)):
         # print(dev_ind)
         x_train = x.iloc[train_ind]
         y_train = y.iloc[train_ind]
-        x_val = x.iloc[val_ind]
-        y_val = y.iloc[val_ind]
+        # x_val = x.iloc[val_ind]
+        # y_val = y.iloc[val_ind]
         x_test = x.iloc[test_ind]
-        # y_test = y.iloc[test_ind]
+        y_test = y.iloc[test_ind]
 
         lgb_train = lgb.Dataset(x_train, y_train)
-        lgb_val = lgb.Dataset(x_val, y_val, reference=lgb_train)
+        lgb_val = lgb.Dataset(x_test, y_test, reference=lgb_train)
 
         model = lgb.train(params=lgb_params,
                           train_set=lgb_train,
-                          valid_sets=lgb_val)
+                          valid_sets=lgb_val,
+                          feval=lgb_qwk)
 
-        y_val_pred = model.predict(x_val, num_iteration=model.best_iteration)
+        # y_val_pred = model.predict(x_test, num_iteration=model.best_iteration)
 
-        params = post_processing(y_val, y_val_pred)
-        all_params.append(params)
+        params = {
+            'threshold_0': 1.12,
+            'threshold_1': 1.62,
+            'threshold_2': 2.20
+            },
+        # params = post_processing(y_val, y_val_pred)
+        # all_params.append(params)
 
         y_pred = model.predict(x_test, num_iteration=model.best_iteration)
+        all_importance.append(pd.DataFrame(model.feature_importance(), index=x_train.columns))
         y_pred = func(y_pred, params)
         total_pred[test_ind] = y_pred
 
@@ -482,11 +639,12 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
                 test_x, num_iteration=model.best_iteration)
             test_pred = func(test_pred, params)
             total_test_pred[:, fold_ind] = test_pred
+    all_importance = pd.concat(all_importance, axis=1)
 
-    loss = qwk(y, total_pred)
+    loss = qwk(total_pred, y)
     print(f"val_loss: {loss}")
 
-    return model, all_params, pd.DataFrame(total_test_pred)
+    return model, pd.DataFrame(total_test_pred)
 
 
 def predict_main(pred_df):
@@ -509,6 +667,8 @@ def main():
                                                train_labels_df)
     print(compiled_train.shape, compiled_test.shape)
     print('--train--')
+    compiled_train.columns = compiled_train.columns.str.replace(',', '')
+    compiled_test.columns = compiled_test.columns.str.replace(',', '')
     pred_df = train_main(compiled_train, compiled_test)
 
     print('--predict--')
