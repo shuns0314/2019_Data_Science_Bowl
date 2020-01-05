@@ -1,4 +1,4 @@
-# CV: 0.572 LB:0.528
+# CV: 0.553 LB:0.519
 from typing import Tuple
 import random
 from collections import Counter, defaultdict
@@ -462,8 +462,8 @@ def qwk(a1, a2):
     return 1 - o / e
 
 
-
 def stratified_group_k_fold(X, y, groups, k, seed=None):
+    np.random.seed(seed)
     # ラベルの数をカウント
     labels_num = np.max(y) + 1
     # 各グループのラベルの数をカウントする
@@ -503,17 +503,29 @@ def stratified_group_k_fold(X, y, groups, k, seed=None):
 
     for i in range(k):
         test_k = i
-        val_k = i+1 if i+1 != k else 0
+        # val_k = i+1 if i+1 != k else 0
         # print(val_k)
-        train_groups = all_groups - groups_per_fold[test_k] - groups_per_fold[val_k]
+        train_groups = all_groups - groups_per_fold[test_k]  #  - groups_per_fold[val_k]
         # val_groups = groups_per_fold[val_k]
         test_groups = groups_per_fold[test_k]
-
+        # print(test_groups)
         train_indices = [i for i, g in enumerate(groups) if g in train_groups]
         # val_indices = [i for i, g in enumerate(groups) if g in val_groups]
-        test_indices = [i for i, g in enumerate(groups) if g in test_groups]
+        # test_indices = {str(g): [i for i, g in enumerate(groups) if g in test_groups]}
 
-        yield train_indices, test_indices, # val_indices,
+        test_indices = []
+        n_g = None
+        test_list = []
+        for i, g in enumerate(groups):
+            if g in test_groups:
+                if n_g is not None and n_g != g:
+                    test_indices.append(test_list)
+                    test_list = []
+                test_list.append(i)
+                n_g = g
+
+        test_indices = [np.random.choice(i) for i in test_indices]
+        yield train_indices, test_indices  # val_indices,
 
 
 def get_distribution(y_vals):
@@ -590,8 +602,8 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         }
 
     x = x.drop('installation_id', axis=1)
-    total_pred = np.zeros(y.shape)
-
+    # total_pred = np.zeros(y.shape)
+    total_loss = []
     func = np.frompyfunc(threshold, 2, 1)
 
     if test_df is not None:
@@ -631,9 +643,11 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         # all_params.append(params)
 
         y_pred = model.predict(x_test, num_iteration=model.best_iteration)
-        all_importance.append(pd.DataFrame(model.feature_importance(), index=x_train.columns))
+        all_importance.append(pd.DataFrame(model.feature_importance('gain'), index=x_train.columns))
         y_pred = func(y_pred, params)
-        total_pred[test_ind] = y_pred
+
+        total_loss.append(qwk(y_pred, y_test))
+        # total_pred[test_ind] = y_pred
 
         if test_df is not None:
             test_pred = model.predict(
@@ -642,7 +656,7 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
             total_test_pred[:, fold_ind] = test_pred
     all_importance = pd.concat(all_importance, axis=1)
 
-    loss = qwk(total_pred, y)
+    loss = np.mean(total_loss)
     print(f"val_loss: {loss}")
 
     return model, pd.DataFrame(total_test_pred)

@@ -55,7 +55,7 @@ def main():
 
 def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.DataFrame:
 
-    num_fold = 8
+    num_fold = 10
 
     y = train_df['accuracy_group']
     x = train_df.drop('accuracy_group', axis=1)
@@ -67,8 +67,8 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         }
 
     x = x.drop('installation_id', axis=1)
-    total_pred = np.zeros(y.shape)
-
+    # total_pred = np.zeros(y.shape)
+    total_loss = []
     func = np.frompyfunc(threshold, 2, 1)
 
     if test_df is not None:
@@ -110,7 +110,9 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         y_pred = model.predict(x_test, num_iteration=model.best_iteration)
         all_importance.append(pd.DataFrame(model.feature_importance('gain'), index=x_train.columns))
         y_pred = func(y_pred, params)
-        total_pred[test_ind] = y_pred
+
+        total_loss.append(qwk(y_pred, y_test))
+        # total_pred[test_ind] = y_pred
 
         if test_df is not None:
             test_pred = model.predict(
@@ -119,7 +121,7 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
             total_test_pred[:, fold_ind] = test_pred
     all_importance = pd.concat(all_importance, axis=1)
 
-    loss = qwk(total_pred, y)
+    loss = np.mean(total_loss)
     print(f"val_loss: {loss}")
 
     if test_df is None:
