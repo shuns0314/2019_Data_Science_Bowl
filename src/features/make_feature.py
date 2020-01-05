@@ -40,6 +40,8 @@ class GetData():
         self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
         # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
 
+        self.total_duration = 0
+
     def process(self, user_sample, installation_id):
 
         all_assessments = []
@@ -51,7 +53,7 @@ class GetData():
                                               self.all_title_event_code,
                                               test_set=self.test_set)
         # まずgame_sessionでgroupbyする
-        for i, session in user_sample.groupby('game_session', sort=False):
+        for i, (session_id, session) in enumerate(user_sample.groupby('game_session', sort=False)):
             session_type = session['type'].iloc[0]
             # print(session_type)
             # game_session数が1以下を省く
@@ -62,6 +64,10 @@ class GetData():
                     second_condition = True
                 else:
                     second_condition = False
+            
+            # gameを初めて開始してからの時間を計測
+            if i == 0:
+                first_session = session.iloc[0, 2]
 
             features: dict = self.user_activities_count.copy()
 
@@ -79,7 +85,10 @@ class GetData():
                     features.update(self.title_count.copy())
                     # features.update(self.title_event_code_count.copy())
 
+                    features['total_duration'] = self.total_duration
                     all_assessments.append(features)
+
+            self.total_duration = first_session - session.iloc[-1, 2]
 
             self.count_actions += len(session)
             self.event_code_count = self.update_counters(
@@ -141,8 +150,8 @@ class GetAssessmentFeature:
 
         self.last_accuracy_title = {'acc_' + title: -1 for title in assess_titles}
 
-        self.so_cool = 0
-        self.greatjob = 0
+        # self.so_cool = 0
+        # self.greatjob = 0
 
     def process(self, session, features):
         all_attempts = session.query(
