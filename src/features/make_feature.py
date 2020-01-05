@@ -41,6 +41,7 @@ class GetData():
         # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
 
         self.total_duration = 0
+        self.frequency = 0
 
     def process(self, user_sample, installation_id):
 
@@ -86,11 +87,14 @@ class GetData():
                     # features.update(self.title_event_code_count.copy())
 
                     features['total_duration'] = self.total_duration
+                    features['frequency'] = self.frequency
+
                     all_assessments.append(features)
 
             self.total_duration = first_session - session.iloc[-1, 2]
-
             self.count_actions += len(session)
+            self.frequency = self.count_actions / self.total_duration
+
             self.event_code_count = self.update_counters(
                 session, self.event_code_count, "event_code")
             self.event_id_count = self.update_counters(
