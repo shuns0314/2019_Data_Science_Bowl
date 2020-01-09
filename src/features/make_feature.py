@@ -53,6 +53,7 @@ class GetData():
                                               self.activities_labels,
                                               self.all_title_event_code,
                                               test_set=self.test_set)
+        first_session = user_sample.iloc[0, 2]
         # まずgame_sessionでgroupbyする
         for i, (session_id, session) in enumerate(user_sample.groupby('game_session', sort=False)):
             session_type = session['type'].iloc[0]
@@ -65,11 +66,9 @@ class GetData():
                     second_condition = True
                 else:
                     second_condition = False
-            
-            # gameを初めて開始してからの時間を計測
-            if i == 0:
-                first_session = session.iloc[0, 2]
 
+            # gameを初めて開始してからの時間を計測
+            # if i == 0:
             features: dict = self.user_activities_count.copy()
 
             # session typeがAssessmentのやつだけ、カウントする。
@@ -91,9 +90,12 @@ class GetData():
 
                     all_assessments.append(features)
 
-            self.total_duration = first_session - session.iloc[-1, 2]
+            self.total_duration = (session.iloc[-1, 2] - first_session).seconds
             self.count_actions += len(session)
-            self.frequency = self.count_actions / self.total_duration
+            if self.total_duration == 0:
+                self.frequency = 0
+            else:
+                self.frequency = self.count_actions / self.total_duration
 
             self.event_code_count = self.update_counters(
                 session, self.event_code_count, "event_code")
