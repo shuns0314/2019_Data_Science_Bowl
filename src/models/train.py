@@ -35,15 +35,19 @@ def main():
         os.makedirs(f'models/{args.name}')
 
     if args.test_csv == 'None':
-        model, all_importance, pred_df = lgb_regression(train_df)
+        model, all_importance, pred_df, loss = lgb_regression(train_df)
     else:
         coefficient = train_df['accuracy_group'].value_counts(sort=False)/len(train_df['accuracy_group'])
         test_df = pd.read_csv(f"data/processed/{args.test_csv}.csv", index_col=0)
-        model, all_importance, pred_df = lgb_regression(train_df, test_df)
+        model, all_importance, pred_df, loss = lgb_regression(train_df, test_df)
         all_importance.to_csv(f'models/{args.name}/all_importance.csv')
         pred_df.to_csv(f'models/{args.name}/check_cv.csv')
         pred_df = pred_df.apply(lambda x: x.mode()[0] if len(x.mode()) == 1 else coefficient[x.mode()].idxmax(), axis=1)
         pred_df.to_csv(f'models/{args.name}/submission.csv', header=False)
+
+    with open(f'models/{args.name}/loss.txt', mode='w') as f:
+        print(f"val_loss: {loss}")
+        f.write(f"val_loss: {loss}")
 
     # modelのsave
     joblib.dump(model, f'models/{args.name}/model_{args.name}.pkl')
@@ -122,12 +126,11 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
     all_importance = pd.concat(all_importance, axis=1)
 
     loss = np.mean(total_loss)
-    print(f"val_loss: {loss}")
 
     if test_df is None:
-        return model, all_importance
+        return model, all_importance, loss
     else:
-        return model, all_importance, pd.DataFrame(total_test_pred)
+        return model, all_importance, pd.DataFrame(total_test_pred), loss
 
 
 if __name__ == "__main__":
