@@ -1,3 +1,4 @@
+import json
 from collections import Counter
 from typing import Dict
 
@@ -43,6 +44,16 @@ class GetData():
         self.total_duration = 0
         self.frequency = 0
 
+        self.game_mean_event_count = 0
+        self.accumulated_game_miss = 0
+
+        self.game_round = []
+        self.game_duration = []
+        self.game_level = []
+
+        self.so_cool = 0
+        self.greatjob = 0
+
     def process(self, user_sample, installation_id):
 
         all_assessments = []
@@ -55,7 +66,8 @@ class GetData():
                                               test_set=self.test_set)
         first_session = user_sample.iloc[0, 2]
         # まずgame_sessionでgroupbyする
-        for i, (session_id, session) in enumerate(user_sample.groupby('game_session', sort=False)):
+        for i, (session_id, session) in enumerate(
+                user_sample.groupby('game_session', sort=False)):
             session_type = session['type'].iloc[0]
             # print(session_type)
             # game_session数が1以下を省く
@@ -70,6 +82,41 @@ class GetData():
             # gameを初めて開始してからの時間を計測
             # if i == 0:
             features: dict = self.user_activities_count.copy()
+
+            if session_type == "Game":
+
+                self.game_mean_event_count = (self.game_mean_event_count + session['event_count'].iloc[-1])/2.0
+
+                game_s = session[session.event_code == 2030]
+                misses_cnt = self.count_miss(game_s)
+                self.accumulated_game_miss += misses_cnt
+
+                try:
+                    game_round_ = json.loads(session['event_data'].iloc[-1])["round"]
+                    self.game_round.append(game_round_)
+
+                except:
+                    pass
+
+                try:
+                    game_duration_ = json.loads(session['event_data'].iloc[-1])["duration"]
+                    self.game_duration.append(game_duration_)
+                except:
+                    pass
+
+                try:
+                    game_level_ = json.loads(session['event_data'].iloc[-1])["level"]
+                    self.game_level.append(game_level_)
+                except:
+                    pass
+
+            if session_type == 'Activity':
+                # 特徴量に前回までのcoolとgreatの数を追加
+                so_cool = session['event_data'].str.contains('SoCool').sum()
+                self.so_cool += so_cool
+
+                greatjob = session['event_data'].str.contains('GreatJob').sum()
+                self.greatjob += greatjob
 
             # session typeがAssessmentのやつだけ、カウントする。
             if (session_type == 'Assessment') & (second_condition):
@@ -87,6 +134,21 @@ class GetData():
 
                     features['total_duration'] = self.total_duration
                     features['frequency'] = self.frequency
+
+                    features['game_mean_event_count'] = self.game_mean_event_count
+                    features['accumulated_game_miss'] = self.accumulated_game_miss
+                    features['mean_game_round'] = np.mean(self.game_round) if len(self.game_round) != 0 else 0
+                    features['max_game_round'] = np.max(self.game_round) if len(self.game_round) != 0 else 0
+                    # features['sum_game_round'] = np.max(self.game_round) if len(self.game_round) != 0 else 0
+                    features['mean_game_duration'] = np.mean(self.game_duration) if len(self.game_duration) != 0 else 0
+                    features['max_game_duration'] = np.max(self.game_duration) if len(self.game_duration) != 0 else 0
+                    features['sum_game_duration'] = np.sum(self.game_duration) if len(self.game_duration) != 0 else 0
+                    features['mean_game_level'] = np.mean(self.game_level) if len(self.game_level) != 0 else 0
+                    # features['max_game_level'] = np.max(self.game_level) if len(self.game_level) != 0 else 0
+                    # features['sum_game_level'] = np.sum(self.game_level) if len(self.game_level) != 0 else 0
+
+                    features['so_cool'] = self.so_cool
+                    features['greatjob'] = self.greatjob
 
                     all_assessments.append(features)
 
@@ -124,6 +186,14 @@ class GetData():
             counter[x] += num_of_session_count[k]
         return counter
 
+    def count_miss(self, df):
+        cnt = 0
+        for e in range(len(df)):
+            x = df['event_data'].iloc[e]
+            y = json.loads(x)['misses']
+            cnt += y
+        return cnt
+
 
 class GetAssessmentFeature:
 
@@ -156,8 +226,7 @@ class GetAssessmentFeature:
 
         self.last_accuracy_title = {'acc_' + title: -1 for title in assess_titles}
 
-        # self.so_cool = 0
-        # self.greatjob = 0
+
 
     def process(self, session, features):
         all_attempts = session.query(
@@ -171,9 +240,6 @@ class GetAssessmentFeature:
         session_title_text = self.activities_labels[session_title]
         # 特徴量に前回までの正解数と失敗数追加
         features = self.add_count_attempts(features, all_attempts)
-
-        # 特徴量に前回までのcoolとgreatの数を追加
-        # features = self.add_count_identifier(features, all_attempts)
 
         # 特徴量に前回までのaccuracyを追加
         count_acc = self.count_accuracy/self.counter if self.counter > 0 else 0
@@ -219,8 +285,10 @@ class GetAssessmentFeature:
     def add_duration_mean(self, df, session):
         if self.durations == []:
             df['duration_mean'] = 0
+            df['duration_max'] = 0
         else:
             df['duration_mean'] = np.mean(self.durations)
+            df['duration_max'] = np.max(self.durations)
 
         self.durations.append(
             (session.iloc[-1, 2] - session.iloc[0, 2]).seconds
@@ -253,19 +321,6 @@ class GetAssessmentFeature:
         df['count_uncorrect_attempts'] = self.count_uncorrect_attempts
         self.false_attempts = all_attempts['event_data'].str.contains('false').sum()
         self.count_uncorrect_attempts += self.false_attempts
-        return df
-
-    def add_count_identifier(self,
-                             df: pd.DataFrame,
-                             all_attempts: pd.DataFrame):
-        """result: 'true' or 'false'."""
-        # cool
-        df['so_cool'] = self.so_cool
-        self.so_cool = all_attempts['event_data'].str.contains('Dot_SoCool').sum()
-
-        # greatjob
-        df['greatjob'] = self.greatjob
-        self.false_attempts = all_attempts['event_data'].str.contains('Dot_GreatJob').sum()
         return df
 
     def calc_accuracy(self, true, false):
