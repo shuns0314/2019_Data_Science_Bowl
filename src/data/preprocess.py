@@ -97,6 +97,9 @@ def preprocess(train: pd.DataFrame,
         test_set=True)
     compiled_test = compile_history.compile_history_data(test)
 
+    compiled_train = feature_preprocess(compiled_train)
+    compiled_test = feature_preprocess(compiled_test)
+
     now = datetime.now().strftime('%Y%m%d_%H%M%S')
     compiled_train.to_csv(f'/code/data/processed/proceeded_train_{now}.csv')
     compiled_test.to_csv(f'/code/data/processed/proceeded_test_{now}.csv')
@@ -104,7 +107,7 @@ def preprocess(train: pd.DataFrame,
 
 def encode_title(train_df: pd.DataFrame,
                  test_df: pd.DataFrame
-                 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+                 ) -> dict:
     """各DataFrameのtitleを番号に変換するためのmethod.
 
     return:
@@ -194,6 +197,27 @@ class CompileHistory:
         compiled_data = get_data.process(data, installation_id)
         # print(f"compiled_data: {compiled_data}")
         return compiled_data, i
+
+
+def feature_preprocess(df):
+    """game_sessionごとではなく、instration_idごとのcountとか"""
+    df['installation_session_count'] = df.groupby(['installation_id'])['Clip'].transform('count')
+    df['installation_duration_mean'] = df.groupby(['installation_id'])['duration_mean'].transform('mean')
+    # df['installation_duration_std'] = df.groupby(['installation_id'])['duration_mean'].transform('std')
+    df['installation_title_nunique'] = df.groupby(['installation_id'])['session_title'].transform('nunique')
+    # df['sum_event_code_count'] = df[[2050, 4100, 4230, 5000, 4235, 2060, 4110, 5010, 2070, 2075, 2080, 2081, 2083, 3110, 4010, 3120, 3121, 4020, 4021, 
+    #                                 4022, 4025, 4030, 4031, 3010, 4035, 4040, 3020, 3021, 4045, 2000, 4050, 2010, 2020, 4070, 2025, 2030, 4080, 2035, 
+    #                                 2040, 4090, 4220, 4095]].sum(axis=1)
+    df['sum_event_code_2000'] = df[[2050, 2060, 2070, 2075, 2080, 2081, 2083,
+                                    2000, 2010, 2020, 2025, 2030, 2035, 2040]].sum(axis=1)
+    df['sum_event_code_3000'] = df[[3110, 3120, 3121,
+                                    3010, 3020, 3021]].sum(axis=1)
+    df['sum_event_code_4000'] = df[[4100, 4230, 4235, 4110, 4010, 4020, 4021,
+                                    4022, 4025, 4030, 4031, 4035, 4040, 4045,
+                                    4050, 4070, 4080, 4090, 4220, 4095]].sum(axis=1)
+    df['installation_event_code_count_mean'] = df.groupby(['installation_id'])['sum_event_code_count'].transform('mean')
+    # df['installation_event_code_count_std'] = df.groupby(['installation_id'])['sum_event_code_count'].transform('std')    
+    return df
 
 
 if __name__ == "__main__":
