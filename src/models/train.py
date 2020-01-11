@@ -48,6 +48,7 @@ def main():
     with open(f'models/{args.name}/loss.txt', mode='w') as f:
         print(f"val_loss: {loss}")
         f.write(f"val_loss: {loss}")
+        f.write(f"train_csv: {args.name}")
 
     # modelのsave
     joblib.dump(model, f'models/{args.name}/model_{args.name}.pkl')
@@ -59,7 +60,7 @@ def main():
 
 def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.DataFrame:
 
-    num_fold = 10
+    num_fold = 8
 
     y = train_df['accuracy_group']
     x = train_df.drop('accuracy_group', axis=1)
