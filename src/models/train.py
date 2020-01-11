@@ -47,8 +47,8 @@ def main():
 
     with open(f'models/{args.name}/loss.txt', mode='w') as f:
         print(f"val_loss: {loss}")
-        f.write(f"val_loss: {loss}")
-        f.write(f"train_csv: {args.name}")
+        f.write(f"val_loss: {loss}\n")
+        f.write(f"train_csv: {args.name}\n")
 
     # modelのsave
     joblib.dump(model, f'models/{args.name}/model_{args.name}.pkl')
