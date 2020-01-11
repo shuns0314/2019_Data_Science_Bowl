@@ -1,6 +1,8 @@
-from typing import Tuple
+# cv: 0.54401
+from typing import Tuple, Dict
 import random
 from collections import Counter, defaultdict
+import json
 
 import pandas as pd
 import numpy as np
@@ -13,6 +15,10 @@ import lightgbm as lgb
 # /code/src/features/make_feature.py
 RAW_PATH = "/code/data/raw"
 
+
+###############################################################################
+# preprocessing
+###############################################################################
 
 def preprocess(train: pd.DataFrame,
                test: pd.DataFrame,
@@ -78,6 +84,9 @@ def preprocess(train: pd.DataFrame,
         all_title_event_code=all_title_event_code,
         test_set=True)
     compiled_test = compile_history.compile_history_data(test)
+
+    compiled_train = feature_preprocess(compiled_train)
+    compiled_test = feature_preprocess(compiled_test)
 
     return compiled_train, compiled_test
 
@@ -153,7 +162,20 @@ class GetData():
         self.event_code_count: Dict[str, int] = {ev: 0 for ev in self.list_of_event_code}
         self.event_id_count: Dict[str, int] = {eve: 0 for eve in self.list_of_event_id}
         self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
-        self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
+        # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
+
+        self.total_duration = 0
+        self.frequency = 0
+
+        self.game_mean_event_count = 0
+        self.accumulated_game_miss = 0
+
+        self.game_round = []
+        self.game_duration = []
+        self.game_level = []
+
+        self.so_cool = 0
+        self.greatjob = 0
 
     def process(self, user_sample, installation_id):
 
@@ -165,8 +187,10 @@ class GetData():
                                               self.activities_labels,
                                               self.all_title_event_code,
                                               test_set=self.test_set)
+        first_session = user_sample.iloc[0, 2]
         # まずgame_sessionでgroupbyする
-        for i, session in user_sample.groupby('game_session', sort=False):
+        for i, (session_id, session) in enumerate(
+                user_sample.groupby('game_session', sort=False)):
             session_type = session['type'].iloc[0]
             # print(session_type)
             # game_session数が1以下を省く
@@ -178,7 +202,44 @@ class GetData():
                 else:
                     second_condition = False
 
+            # gameを初めて開始してからの時間を計測
+            # if i == 0:
             features: dict = self.user_activities_count.copy()
+
+            if session_type == "Game":
+
+                self.game_mean_event_count = (self.game_mean_event_count + session['event_count'].iloc[-1])/2.0
+
+                game_s = session[session.event_code == 2030]
+                misses_cnt = self.count_miss(game_s)
+                self.accumulated_game_miss += misses_cnt
+
+                try:
+                    game_round_ = json.loads(session['event_data'].iloc[-1])["round"]
+                    self.game_round.append(game_round_)
+
+                except:
+                    pass
+
+                try:
+                    game_duration_ = json.loads(session['event_data'].iloc[-1])["duration"]
+                    self.game_duration.append(game_duration_)
+                except:
+                    pass
+
+                try:
+                    game_level_ = json.loads(session['event_data'].iloc[-1])["level"]
+                    self.game_level.append(game_level_)
+                except:
+                    pass
+
+            if session_type == 'Activity':
+                # 特徴量に前回までのcoolとgreatの数を追加
+                so_cool = session['event_data'].str.contains('SoCool').sum()
+                self.so_cool += so_cool
+
+                greatjob = session['event_data'].str.contains('GreatJob').sum()
+                self.greatjob += greatjob
 
             # session typeがAssessmentのやつだけ、カウントする。
             if (session_type == 'Assessment') & (second_condition):
@@ -192,19 +253,43 @@ class GetData():
                     features.update(self.event_code_count.copy())
                     features.update(self.event_id_count.copy())
                     features.update(self.title_count.copy())
-                    features.update(self.title_event_code_count.copy())
+                    # features.update(self.title_event_code_count.copy())
+
+                    features['total_duration'] = self.total_duration
+                    features['frequency'] = self.frequency
+
+                    features['game_mean_event_count'] = self.game_mean_event_count
+                    features['accumulated_game_miss'] = self.accumulated_game_miss
+                    features['mean_game_round'] = np.mean(self.game_round) if len(self.game_round) != 0 else 0
+                    features['max_game_round'] = np.max(self.game_round) if len(self.game_round) != 0 else 0
+                    # features['sum_game_round'] = np.max(self.game_round) if len(self.game_round) != 0 else 0
+                    features['mean_game_duration'] = np.mean(self.game_duration) if len(self.game_duration) != 0 else 0
+                    features['max_game_duration'] = np.max(self.game_duration) if len(self.game_duration) != 0 else 0
+                    features['sum_game_duration'] = np.sum(self.game_duration) if len(self.game_duration) != 0 else 0
+                    features['mean_game_level'] = np.mean(self.game_level) if len(self.game_level) != 0 else 0
+                    # features['max_game_level'] = np.max(self.game_level) if len(self.game_level) != 0 else 0
+                    # features['sum_game_level'] = np.sum(self.game_level) if len(self.game_level) != 0 else 0
+
+                    features['so_cool'] = self.so_cool
+                    features['greatjob'] = self.greatjob
 
                     all_assessments.append(features)
 
+            self.total_duration = (session.iloc[-1, 2] - first_session).seconds
             self.count_actions += len(session)
+            if self.total_duration == 0:
+                self.frequency = 0
+            else:
+                self.frequency = self.count_actions / self.total_duration
+
             self.event_code_count = self.update_counters(
                 session, self.event_code_count, "event_code")
             self.event_id_count = self.update_counters(
                 session, self.event_id_count, "event_id")
             self.title_count = self.update_counters(
                 session, self.title_count, 'title')
-            self.title_event_code_count = self.update_counters(
-                session, self.title_event_code_count, 'title_event_code')
+            # self.title_event_code_count = self.update_counters(
+            #     session, self.title_event_code_count, 'title_event_code')
 
             # second_conditionがFalseのときは、user_activities_countのみ増える。
             if self.last_activity != session_type:
@@ -224,8 +309,15 @@ class GetData():
             counter[x] += num_of_session_count[k]
         return counter
 
+    def count_miss(self, df):
+        cnt = 0
+        for e in range(len(df)):
+            x = df['event_data'].iloc[e]
+            y = json.loads(x)['misses']
+            cnt += y
+        return cnt
 
-# make_feature
+
 class GetAssessmentFeature:
 
     def __init__(self,
@@ -256,9 +348,6 @@ class GetAssessmentFeature:
         self.false_attempts = 0
 
         self.last_accuracy_title = {'acc_' + title: -1 for title in assess_titles}
-
-        self.so_cool = 0
-        self.greatjob = 0
 
     def process(self, session, features):
         all_attempts = session.query(
@@ -317,8 +406,10 @@ class GetAssessmentFeature:
     def add_duration_mean(self, df, session):
         if self.durations == []:
             df['duration_mean'] = 0
+            df['duration_max'] = 0
         else:
             df['duration_mean'] = np.mean(self.durations)
+            df['duration_max'] = np.max(self.durations)
 
         self.durations.append(
             (session.iloc[-1, 2] - session.iloc[0, 2]).seconds
@@ -414,6 +505,32 @@ class CompileHistory:
         return compiled_data, i
 
 
+def feature_preprocess(df):
+    """game_sessionごとではなく、instration_idごとのcountとか"""
+    df['installation_session_count'] = df.groupby(['installation_id'])['Clip'].transform('count')
+    df['installation_duration_mean'] = df.groupby(['installation_id'])['duration_mean'].transform('mean')
+    # df['installation_duration_std'] = df.groupby(['installation_id'])['duration_mean'].transform('std')
+    df['installation_title_nunique'] = df.groupby(['installation_id'])['session_title'].transform('nunique')
+    df['sum_event_code_count'] = df[[2050, 4100, 4230, 5000, 4235, 2060, 4110, 5010, 2070, 2075, 2080, 2081, 2083, 3110, 4010, 3120, 3121, 4020, 4021, 
+                                    4022, 4025, 4030, 4031, 3010, 4035, 4040, 3020, 3021, 4045, 2000, 4050, 2010, 2020, 4070, 2025, 2030, 4080, 2035, 
+                                    2040, 4090, 4220, 4095]].sum(axis=1)
+    df['sum_event_code_2000'] = df[[2050, 2060, 2070, 2075, 2080, 2081, 2083,
+                                    2000, 2010, 2020, 2025, 2030, 2035, 2040]].sum(axis=1)
+    df['sum_event_code_3000'] = df[[3110, 3120, 3121,
+                                    3010, 3020, 3021]].sum(axis=1)
+    df['sum_event_code_4000'] = df[[4100, 4230, 4235, 4110, 4010, 4020, 4021,
+                                    4022, 4025, 4030, 4031, 4035, 4040, 4045,
+                                    4050, 4070, 4080, 4090, 4220, 4095]].sum(axis=1)
+    df['installation_event_code_count_mean'] = df.groupby(['installation_id'])['sum_event_code_count'].transform('mean')
+    # df['installation_event_code_count_std'] = df.groupby(['installation_id'])['sum_event_code_count'].transform('std')
+    df.drop('sum_event_code_count', axis=1, inplace=True)
+    return df
+
+
+###############################################################################
+# loss
+###############################################################################
+
 def lgb_qwk(preds, data):
     params = {
         'threshold_0': 1.12,
@@ -460,6 +577,10 @@ def qwk(a1, a2):
 
     return 1 - o / e
 
+
+###############################################################################
+# closs validation
+###############################################################################
 
 def stratified_group_k_fold(X, y, groups, k, seed=None):
     np.random.seed(seed)
@@ -527,11 +648,9 @@ def stratified_group_k_fold(X, y, groups, k, seed=None):
         yield train_indices, test_indices  # val_indices,
 
 
-def get_distribution(y_vals):
-    y_distr = Counter(y_vals)
-    y_vals_sum = sum(y_distr.values())
-    return [f'{y_distr[i] / y_vals_sum:.2%}' for i in range(np.max(y_vals) + 1)]
-
+###############################################################################
+# post processing
+###############################################################################
 
 def post_processing(y_test, y_pred):
 
@@ -577,7 +696,10 @@ def threshold(x, params):
     return y
 
 
+###############################################################################
 # train
+###############################################################################
+
 def train_main(train_df, test_df):
     """main."""
     _, pred_df = lgb_regression(train_df, test_df)
