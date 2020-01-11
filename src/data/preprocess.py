@@ -205,9 +205,9 @@ def feature_preprocess(df):
     df['installation_duration_mean'] = df.groupby(['installation_id'])['duration_mean'].transform('mean')
     # df['installation_duration_std'] = df.groupby(['installation_id'])['duration_mean'].transform('std')
     df['installation_title_nunique'] = df.groupby(['installation_id'])['session_title'].transform('nunique')
-    # df['sum_event_code_count'] = df[[2050, 4100, 4230, 5000, 4235, 2060, 4110, 5010, 2070, 2075, 2080, 2081, 2083, 3110, 4010, 3120, 3121, 4020, 4021, 
-    #                                 4022, 4025, 4030, 4031, 3010, 4035, 4040, 3020, 3021, 4045, 2000, 4050, 2010, 2020, 4070, 2025, 2030, 4080, 2035, 
-    #                                 2040, 4090, 4220, 4095]].sum(axis=1)
+    df['sum_event_code_count'] = df[[2050, 4100, 4230, 5000, 4235, 2060, 4110, 5010, 2070, 2075, 2080, 2081, 2083, 3110, 4010, 3120, 3121, 4020, 4021, 
+                                    4022, 4025, 4030, 4031, 3010, 4035, 4040, 3020, 3021, 4045, 2000, 4050, 2010, 2020, 4070, 2025, 2030, 4080, 2035, 
+                                    2040, 4090, 4220, 4095]].sum(axis=1)
     df['sum_event_code_2000'] = df[[2050, 2060, 2070, 2075, 2080, 2081, 2083,
                                     2000, 2010, 2020, 2025, 2030, 2035, 2040]].sum(axis=1)
     df['sum_event_code_3000'] = df[[3110, 3120, 3121,
@@ -216,7 +216,8 @@ def feature_preprocess(df):
                                     4022, 4025, 4030, 4031, 4035, 4040, 4045,
                                     4050, 4070, 4080, 4090, 4220, 4095]].sum(axis=1)
     df['installation_event_code_count_mean'] = df.groupby(['installation_id'])['sum_event_code_count'].transform('mean')
-    # df['installation_event_code_count_std'] = df.groupby(['installation_id'])['sum_event_code_count'].transform('std')    
+    # df['installation_event_code_count_std'] = df.groupby(['installation_id'])['sum_event_code_count'].transform('std')
+    df.drop('sum_event_code_count', axis=1, inplace=True) 
     return df
 
 
