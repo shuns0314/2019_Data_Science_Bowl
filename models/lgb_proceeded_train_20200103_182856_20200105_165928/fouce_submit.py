@@ -1,4 +1,5 @@
-# CV: 0.553 LB:0.519
+# CV: 0.553 LB: 0.519
+# CV: 0.555 LB: 0.527
 from typing import Tuple
 import random
 from collections import Counter, defaultdict
