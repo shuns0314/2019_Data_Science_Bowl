@@ -1,4 +1,3 @@
-# cv: 0.54401, LB:0.533
 from typing import Tuple, Dict
 import random
 from collections import Counter, defaultdict
