@@ -1,4 +1,8 @@
-# cv: 0.54401, LB:0.533
+# val_loss: 0.56527 no parameter tuning
+# lr=0.005 : val_loss: 0.53
+# lr=0.1 : val_loss: 0.5688
+# lr=0.03 : val_loss: 0.5666
+# lr=0.06 : val_loss: 0.5757
 from typing import Tuple, Dict
 import random
 from collections import Counter, defaultdict
@@ -10,6 +14,8 @@ from joblib import Parallel, delayed
 import optuna
 from sklearn.metrics import mean_squared_error
 import lightgbm as lgb
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.cluster import KMeans
 
 
 # /code/src/features/make_feature.py
@@ -28,11 +34,27 @@ def preprocess(train: pd.DataFrame,
     test['title_event_code'] = list(map(lambda x, y: str(x) + '_' + str(y), test['title'], test['event_code']))
     all_title_event_code = list(set(train["title_event_code"].unique()).union(test["title_event_code"].unique()))
 
+    # event_idの変換
+    event_clusterizer = EventClusterizer(
+        info_cluster_num=10, args_cluster_num=20
+        )
+    event_cluster = event_clusterizer.process()
+    train = pd.merge(train, event_cluster,  left_on='event_id', right_index=True)
+    # train.drop('event_id', axis=1, inplace=True)
+    # train = train.rename(columns={'clusters': 'event_id'})
+
+    test = pd.merge(test, event_cluster,  left_on='event_id', right_index=True)
+    # test.drop('event_id', axis=1, inplace=True)
+    # test = test.rename(columns={'clusters': 'event_id'})
+
     list_of_user_activities = list(set(train['title'].unique()).union(set(test['title'].unique())))
     # make a list with all the unique 'event_code' from the train and test set
     list_of_event_code = list(set(train['event_code'].unique()).union(set(test['event_code'].unique())))
     # print(list_of_event_code)
+    # print(train['event_id'])
     list_of_event_id = list(set(train['event_id'].unique()).union(set(test['event_id'].unique())))
+    list_of_info_clusters = list(set(train['info_clusters'].unique()).union(set(test['info_clusters'].unique())))
+    list_of_args_clusters = list(set(train['args_clusters'].unique()).union(set(test['args_clusters'].unique())))
     # make a list with all the unique worlds from the train and test set
     list_of_worlds = list(set(train['world'].unique()).union(set(test['world'].unique())))
     # create a dictionary numerating the titles
@@ -70,6 +92,8 @@ def preprocess(train: pd.DataFrame,
         assess_titles=assess_titles,
         list_of_event_code=list_of_event_code,
         list_of_event_id=list_of_event_id,
+        list_of_info_clusters=list_of_info_clusters,
+        list_of_args_clusters=list_of_args_clusters,
         activities_labels=activities_labels,
         all_title_event_code=all_title_event_code
         )
@@ -80,6 +104,8 @@ def preprocess(train: pd.DataFrame,
         assess_titles=assess_titles,
         list_of_event_code=list_of_event_code,
         list_of_event_id=list_of_event_id,
+        list_of_info_clusters=list_of_info_clusters,
+        list_of_args_clusters=list_of_args_clusters,
         activities_labels=activities_labels,
         all_title_event_code=all_title_event_code,
         test_set=True)
@@ -129,6 +155,32 @@ def make_event_code(activities_map: dict):
     return win_code
 
 
+class EventClusterizer:
+    def __init__(self, info_cluster_num=10, args_cluster_num=8):
+        self.info_cluster_num = info_cluster_num
+        self.args_cluster_num = args_cluster_num
+        self.specs_df = pd.read_csv('/code/data/raw/specs.csv')
+
+    def process(self):
+        self.specs_df['info_clusters'] = self.vectorize(
+            columns='info', cluster_num=self.info_cluster_num)
+        self.specs_df['args_clusters'] = self.vectorize(
+            columns='args',  cluster_num=self.args_cluster_num)
+        self.specs_df = self.specs_df.set_index('event_id')
+        return self.specs_df[['info_clusters', 'args_clusters']]
+
+    def vectorize(self, columns, cluster_num):
+        vectorizer = TfidfVectorizer()
+        X = vectorizer.fit_transform(self.specs_df[columns].values)
+        clusters = KMeans(
+            n_clusters=cluster_num,
+            random_state=77,
+            ).fit_predict(X.toarray())
+        clusters = [f'{columns}_' + str(i) for i in clusters]
+        return clusters
+
+
+
 class GetData():
     """各installation_idのおける過去のゲームの実績をまとめるmethod."""
 
@@ -137,6 +189,8 @@ class GetData():
                  assess_titles,
                  list_of_event_code,
                  list_of_event_id,
+                 list_of_info_clusters,
+                 list_of_args_clusters,
                  activities_labels,
                  all_title_event_code,
                  test_set=False):
@@ -145,6 +199,8 @@ class GetData():
         self.assess_titles = assess_titles
         self.list_of_event_code = list_of_event_code
         self.list_of_event_id = list_of_event_id
+        self.list_of_info_clusters = list_of_info_clusters
+        self.list_of_args_clusters = list_of_args_clusters
         self.activities_labels = activities_labels
         self.all_title_event_code = all_title_event_code
 
@@ -161,6 +217,8 @@ class GetData():
         # print(self.list_of_event_code)
         self.event_code_count: Dict[str, int] = {ev: 0 for ev in self.list_of_event_code}
         self.event_id_count: Dict[str, int] = {eve: 0 for eve in self.list_of_event_id}
+        self.info_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_info_clusters}
+        self.args_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_args_clusters}
         self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
         # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
 
@@ -184,10 +242,12 @@ class GetData():
                                               self.assess_titles,
                                               self.list_of_event_code,
                                               self.list_of_event_id,
+                                              self.list_of_info_clusters,
+                                              self.list_of_args_clusters,
                                               self.activities_labels,
                                               self.all_title_event_code,
                                               test_set=self.test_set)
-        first_session = user_sample.iloc[0, 2]
+        first_session = user_sample.iloc[0, user_sample.columns.get_loc('timestamp')]
         # まずgame_sessionでgroupbyする
         for i, (session_id, session) in enumerate(
                 user_sample.groupby('game_session', sort=False)):
@@ -252,6 +312,8 @@ class GetData():
 
                     features.update(self.event_code_count.copy())
                     features.update(self.event_id_count.copy())
+                    features.update(self.info_clusters_count.copy())
+                    features.update(self.args_clusters_count.copy())
                     features.update(self.title_count.copy())
                     # features.update(self.title_event_code_count.copy())
 
@@ -274,8 +336,8 @@ class GetData():
                     features['greatjob'] = self.greatjob
 
                     all_assessments.append(features)
-
-            self.total_duration = (session.iloc[-1, 2] - first_session).seconds
+            # print(session.iloc[-1, session.columns.get_loc('timestamp')])
+            self.total_duration = (session.iloc[-1, session.columns.get_loc('timestamp')] - first_session).seconds
             self.count_actions += len(session)
             if self.total_duration == 0:
                 self.frequency = 0
@@ -286,6 +348,10 @@ class GetData():
                 session, self.event_code_count, "event_code")
             self.event_id_count = self.update_counters(
                 session, self.event_id_count, "event_id")
+            self.info_clusters_count = self.update_counters(
+                session, self.info_clusters_count, "info_clusters")
+            self.args_clusters_count = self.update_counters(
+                session, self.args_clusters_count, "args_clusters")
             self.title_count = self.update_counters(
                 session, self.title_count, 'title')
             # self.title_event_code_count = self.update_counters(
@@ -325,12 +391,16 @@ class GetAssessmentFeature:
                  assess_titles,
                  list_of_event_code,
                  list_of_event_id,
+                 list_of_info_clusters,
+                 list_of_args_clusters,
                  activities_labels,
                  all_title_event_code,
                  test_set=False):
 
         self.list_of_event_code = list_of_event_code
         self.list_of_event_id = list_of_event_id
+        self.list_of_info_clusters = list_of_info_clusters
+        self.list_of_args_clusters = list_of_args_clusters
         self.activities_labels = activities_labels
         self.all_title_event_code = all_title_event_code
         self.assess_titles = assess_titles
@@ -348,6 +418,7 @@ class GetAssessmentFeature:
         self.false_attempts = 0
 
         self.last_accuracy_title = {'acc_' + title: -1 for title in assess_titles}
+
 
     def process(self, session, features):
         all_attempts = session.query(
@@ -412,7 +483,7 @@ class GetAssessmentFeature:
             df['duration_max'] = np.max(self.durations)
 
         self.durations.append(
-            (session.iloc[-1, 2] - session.iloc[0, 2]).seconds
+            (session.iloc[-1, session.columns.get_loc('timestamp')] - session.iloc[0, session.columns.get_loc('timestamp')]).seconds
             )
         return df
 
@@ -455,6 +526,8 @@ class CompileHistory:
                  assess_titles,
                  list_of_event_code,
                  list_of_event_id,
+                 list_of_info_clusters,
+                 list_of_args_clusters,
                  activities_labels,
                  all_title_event_code,
                  test_set: bool = False,):
@@ -463,6 +536,8 @@ class CompileHistory:
         self.assess_titles = assess_titles
         self.list_of_event_code = list_of_event_code
         self.list_of_event_id = list_of_event_id
+        self.list_of_info_clusters = list_of_info_clusters
+        self.list_of_args_clusters = list_of_args_clusters
         self.activities_labels = activities_labels
         self.all_title_event_code = all_title_event_code
         self.test_set = test_set
@@ -476,6 +551,8 @@ class CompileHistory:
             assess_titles=self.assess_titles,
             list_of_event_code=self.list_of_event_code,
             list_of_event_id=self.list_of_event_id,
+            list_of_info_clusters=self.list_of_info_clusters,
+            list_of_args_clusters=self.list_of_args_clusters,
             activities_labels=self.activities_labels,
             all_title_event_code=self.all_title_event_code,
             test_set=self.test_set,
@@ -494,6 +571,15 @@ class CompileHistory:
         # print(compiled_data)
 
         return pd.DataFrame(compiled_data)
+
+    def get_data_for_sort(self,
+                          data: pd.DataFrame,
+                          i: int,
+                          get_data: GetData,
+                          installation_id: str) -> Tuple[pd.DataFrame, int]:
+        compiled_data = get_data.process(data, installation_id)
+        # print(f"compiled_data: {compiled_data}")
+        return compiled_data, i
 
     def get_data_for_sort(self,
                           data: pd.DataFrame,
@@ -718,9 +804,20 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
     groups = np.array(x['installation_id'])
 
     lgb_params = {
-            'objective': 'regression',
-            'metric': 'rmse',
-        }
+            "objective": "regression",
+            "boosting_type": "gbdt",
+            "metric": 'rmse',
+            "verbosity": 0,
+            "early_stopping_round": 50,
+            "learning_rate": 0.06,
+            'max_depth': 7,
+            'num_leaves': 12,
+            'feature_fraction': 0.8504591214222348,
+            'subsample': 0.9,
+            'min_child_weight': 0.29242681756216937,
+            'colsample_bytree': 0.9,
+            'min_gain_to_split': 3.58820515245669e-07
+            }
 
     x = x.drop('installation_id', axis=1)
     # total_pred = np.zeros(y.shape)
@@ -751,7 +848,9 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         model = lgb.train(params=lgb_params,
                           train_set=lgb_train,
                           valid_sets=lgb_val,
-                          feval=lgb_qwk)
+                          feval=lgb_qwk,
+                          num_boost_round=1000,
+                          early_stopping_rounds=50)
 
         # y_val_pred = model.predict(x_test, num_iteration=model.best_iteration)
 
