@@ -1,2 +1,3 @@
 val_loss: 0.5474186020588873
 train_csv: lgb_proceeded_train_20200112_111743_20200112_111907
+tf_idf event: 9, event_id あり

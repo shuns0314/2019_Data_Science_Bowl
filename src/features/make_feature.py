@@ -14,7 +14,8 @@ class GetData():
                  assess_titles,
                  list_of_event_code,
                  list_of_event_id,
-                 list_of_clusters,
+                 list_of_info_clusters,
+                 list_of_args_clusters,
                  activities_labels,
                  all_title_event_code,
                  test_set=False):
@@ -23,7 +24,8 @@ class GetData():
         self.assess_titles = assess_titles
         self.list_of_event_code = list_of_event_code
         self.list_of_event_id = list_of_event_id
-        self.list_of_clusters = list_of_clusters
+        self.list_of_info_clusters = list_of_info_clusters
+        self.list_of_args_clusters = list_of_args_clusters
         self.activities_labels = activities_labels
         self.all_title_event_code = all_title_event_code
 
@@ -40,7 +42,8 @@ class GetData():
         # print(self.list_of_event_code)
         self.event_code_count: Dict[str, int] = {ev: 0 for ev in self.list_of_event_code}
         self.event_id_count: Dict[str, int] = {eve: 0 for eve in self.list_of_event_id}
-        self.clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_clusters}
+        self.info_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_info_clusters}
+        self.args_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_args_clusters}
         self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
         # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
 
@@ -64,7 +67,8 @@ class GetData():
                                               self.assess_titles,
                                               self.list_of_event_code,
                                               self.list_of_event_id,
-                                              self.list_of_clusters,
+                                              self.list_of_info_clusters,
+                                              self.list_of_args_clusters,
                                               self.activities_labels,
                                               self.all_title_event_code,
                                               test_set=self.test_set)
@@ -133,7 +137,8 @@ class GetData():
 
                     features.update(self.event_code_count.copy())
                     features.update(self.event_id_count.copy())
-                    features.update(self.clusters_count.copy())
+                    features.update(self.info_clusters_count.copy())
+                    features.update(self.args_clusters_count.copy())
                     features.update(self.title_count.copy())
                     # features.update(self.title_event_code_count.copy())
 
@@ -168,8 +173,10 @@ class GetData():
                 session, self.event_code_count, "event_code")
             self.event_id_count = self.update_counters(
                 session, self.event_id_count, "event_id")
-            self.clusters_count = self.update_counters(
-                session, self.clusters_count, "clusters")
+            self.info_clusters_count = self.update_counters(
+                session, self.info_clusters_count, "info_clusters")
+            self.args_clusters_count = self.update_counters(
+                session, self.args_clusters_count, "args_clusters")
             self.title_count = self.update_counters(
                 session, self.title_count, 'title')
             # self.title_event_code_count = self.update_counters(
@@ -209,14 +216,16 @@ class GetAssessmentFeature:
                  assess_titles,
                  list_of_event_code,
                  list_of_event_id,
-                 list_of_clusters,
+                 list_of_info_clusters,
+                 list_of_args_clusters,
                  activities_labels,
                  all_title_event_code,
                  test_set=False):
 
         self.list_of_event_code = list_of_event_code
         self.list_of_event_id = list_of_event_id
-        self.list_of_clusters = list_of_clusters
+        self.list_of_info_clusters = list_of_info_clusters
+        self.list_of_args_clusters = list_of_args_clusters
         self.activities_labels = activities_labels
         self.all_title_event_code = all_title_event_code
         self.assess_titles = assess_titles
