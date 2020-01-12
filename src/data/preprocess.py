@@ -7,6 +7,7 @@ import numpy as np
 from joblib import Parallel, delayed
 
 from src.features.make_feature import GetData
+from src.features.tf_idf import EventClusterizer
 
 
 parser = argparse.ArgumentParser()
@@ -40,11 +41,24 @@ def preprocess(train: pd.DataFrame,
     test['title_event_code'] = list(map(lambda x, y: str(x) + '_' + str(y), test['title'], test['event_code']))
     all_title_event_code = list(set(train["title_event_code"].unique()).union(test["title_event_code"].unique()))
 
+    # event_idの変換
+    event_clusterizer = EventClusterizer(cluster_num=9)
+    event_cluster = event_clusterizer.process()
+    train = pd.merge(train, event_cluster,  left_on='event_id', right_index=True)
+    # train.drop('event_id', axis=1, inplace=True)
+    # train = train.rename(columns={'clusters': 'event_id'})
+
+    test = pd.merge(test, event_cluster,  left_on='event_id', right_index=True)
+    # test.drop('event_id', axis=1, inplace=True)
+    # test = test.rename(columns={'clusters': 'event_id'})
+
     list_of_user_activities = list(set(train['title'].unique()).union(set(test['title'].unique())))
     # make a list with all the unique 'event_code' from the train and test set
     list_of_event_code = list(set(train['event_code'].unique()).union(set(test['event_code'].unique())))
     # print(list_of_event_code)
+    # print(train['event_id'])
     list_of_event_id = list(set(train['event_id'].unique()).union(set(test['event_id'].unique())))
+    list_of_clusters = list(set(train['clusters'].unique()).union(set(test['clusters'].unique())))
     # make a list with all the unique worlds from the train and test set
     list_of_worlds = list(set(train['world'].unique()).union(set(test['world'].unique())))
     # create a dictionary numerating the titles
@@ -82,6 +96,7 @@ def preprocess(train: pd.DataFrame,
         assess_titles=assess_titles,
         list_of_event_code=list_of_event_code,
         list_of_event_id=list_of_event_id,
+        list_of_clusters=list_of_clusters,
         activities_labels=activities_labels,
         all_title_event_code=all_title_event_code
         )
@@ -92,6 +107,7 @@ def preprocess(train: pd.DataFrame,
         assess_titles=assess_titles,
         list_of_event_code=list_of_event_code,
         list_of_event_id=list_of_event_id,
+        list_of_clusters=list_of_clusters,
         activities_labels=activities_labels,
         all_title_event_code=all_title_event_code,
         test_set=True)
@@ -149,6 +165,7 @@ class CompileHistory:
                  assess_titles,
                  list_of_event_code,
                  list_of_event_id,
+                 list_of_clusters,
                  activities_labels,
                  all_title_event_code,
                  test_set: bool = False,):
@@ -157,6 +174,7 @@ class CompileHistory:
         self.assess_titles = assess_titles
         self.list_of_event_code = list_of_event_code
         self.list_of_event_id = list_of_event_id
+        self.list_of_clusters = list_of_clusters
         self.activities_labels = activities_labels
         self.all_title_event_code = all_title_event_code
         self.test_set = test_set
@@ -170,6 +188,7 @@ class CompileHistory:
             assess_titles=self.assess_titles,
             list_of_event_code=self.list_of_event_code,
             list_of_event_id=self.list_of_event_id,
+            list_of_clusters=self.list_of_clusters,
             activities_labels=self.activities_labels,
             all_title_event_code=self.all_title_event_code,
             test_set=self.test_set,
