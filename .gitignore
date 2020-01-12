@@ -6,3 +6,4 @@ models/*/*.pkl
 kaggle.json
 *.pyc
 !.gitkeep
+lgb_output/*
