@@ -173,7 +173,7 @@ class EventClusterizer:
         X = vectorizer.fit_transform(self.specs_df[columns].values)
         clusters = KMeans(
             n_clusters=cluster_num,
-            random_state=3,
+            random_state=77,
             ).fit_predict(X.toarray())
         clusters = [f'{columns}_' + str(i) for i in clusters]
         return clusters
@@ -795,8 +795,24 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
 
     lgb_params = {
             "objective": "regression",
-            "metric": 'rmse',
-    }  
+            "boosting_type": "gbdt",
+            "metric": 'rmse'
+    }
+
+    # lgb_params = {
+    #         "objective": "regression",
+    #         "boosting_type": "gbdt",
+    #         "metric": 'rmse',
+    #         "verbosity": 0,
+    #         "early_stopping_round": 50,
+    #         "learning_rate": 0.06,
+    #         'max_depth': 8,
+    #         'num_leaves': 28,
+    #         'feature_fraction': 0.4476004530931245,
+    #         'subsample': 0.9,
+    #         'min_child_weight': 1.3110235824824013,
+    #         'colsample_bytree': 0.8,
+    #         'min_gain_to_split': 0.000966661285874846}
 
     x = x.drop('installation_id', axis=1)
     # total_pred = np.zeros(y.shape)
@@ -812,7 +828,7 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
     all_importance = []
 
     for fold_ind, (train_ind, test_ind) in enumerate(
-            stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=3)):
+            stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=77)):
         # print(dev_ind)
         x_train = x.iloc[train_ind]
         y_train = y.iloc[train_ind]
@@ -828,6 +844,8 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
                           train_set=lgb_train,
                           valid_sets=lgb_val,
                           feval=lgb_qwk)
+                          # num_boost_round=1000,
+                          # early_stopping_rounds=50
 
         # y_val_pred = model.predict(x_test, num_iteration=model.best_iteration)
 
