@@ -1,8 +1,7 @@
-# val_loss: 0.56527 no parameter tuning
-# lr=0.005 : val_loss: 0.53
-# lr=0.1 : val_loss: 0.5688
-# lr=0.03 : val_loss: 0.5666
-# lr=0.06 : val_loss: 0.5757
+# val_loss: 0.5639669088652006 LB: 0.520, num_boost defalut, no parameter tuning seed=77
+# val_loss: 0.5628200088884929 LB: 0.520, num_boost defalut, no parameter tuning seed=3
+# lr=0.06 : val_loss: 0.5644602879589393 (parameter tuning間違いあり)
+# lr=0.06 : val_loss: 0.568959836967692 (fix parameter)
 from typing import Tuple, Dict
 import random
 from collections import Counter, defaultdict
@@ -39,11 +38,11 @@ def preprocess(train: pd.DataFrame,
         info_cluster_num=10, args_cluster_num=20
         )
     event_cluster = event_clusterizer.process()
-    train = pd.merge(train, event_cluster,  left_on='event_id', right_index=True)
+    train = pd.merge(train, event_cluster,  left_on='event_id', right_index=True).sort_index()
     # train.drop('event_id', axis=1, inplace=True)
     # train = train.rename(columns={'clusters': 'event_id'})
 
-    test = pd.merge(test, event_cluster,  left_on='event_id', right_index=True)
+    test = pd.merge(test, event_cluster,  left_on='event_id', right_index=True).sort_index()
     # test.drop('event_id', axis=1, inplace=True)
     # test = test.rename(columns={'clusters': 'event_id'})
 
@@ -174,7 +173,7 @@ class EventClusterizer:
         X = vectorizer.fit_transform(self.specs_df[columns].values)
         clusters = KMeans(
             n_clusters=cluster_num,
-            random_state=77,
+            random_state=3,
             ).fit_predict(X.toarray())
         clusters = [f'{columns}_' + str(i) for i in clusters]
         return clusters
@@ -581,15 +580,6 @@ class CompileHistory:
         # print(f"compiled_data: {compiled_data}")
         return compiled_data, i
 
-    def get_data_for_sort(self,
-                          data: pd.DataFrame,
-                          i: int,
-                          get_data: GetData,
-                          installation_id: str) -> Tuple[pd.DataFrame, int]:
-        compiled_data = get_data.process(data, installation_id)
-        # print(f"compiled_data: {compiled_data}")
-        return compiled_data, i
-
 
 def feature_preprocess(df):
     """game_sessionごとではなく、instration_idごとのcountとか"""
@@ -805,19 +795,8 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
 
     lgb_params = {
             "objective": "regression",
-            "boosting_type": "gbdt",
             "metric": 'rmse',
-            "verbosity": 0,
-            "early_stopping_round": 50,
-            "learning_rate": 0.06,
-            'max_depth': 7,
-            'num_leaves': 12,
-            'feature_fraction': 0.8504591214222348,
-            'subsample': 0.9,
-            'min_child_weight': 0.29242681756216937,
-            'colsample_bytree': 0.9,
-            'min_gain_to_split': 3.58820515245669e-07
-            }
+    }  
 
     x = x.drop('installation_id', axis=1)
     # total_pred = np.zeros(y.shape)
@@ -833,7 +812,7 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
     all_importance = []
 
     for fold_ind, (train_ind, test_ind) in enumerate(
-            stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=77)):
+            stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=3)):
         # print(dev_ind)
         x_train = x.iloc[train_ind]
         y_train = y.iloc[train_ind]
@@ -848,9 +827,7 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         model = lgb.train(params=lgb_params,
                           train_set=lgb_train,
                           valid_sets=lgb_val,
-                          feval=lgb_qwk,
-                          num_boost_round=1000,
-                          early_stopping_rounds=50)
+                          feval=lgb_qwk)
 
         # y_val_pred = model.predict(x_test, num_iteration=model.best_iteration)
 

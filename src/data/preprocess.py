@@ -46,11 +46,11 @@ def preprocess(train: pd.DataFrame,
         info_cluster_num=10, args_cluster_num=20
         )
     event_cluster = event_clusterizer.process()
-    train = pd.merge(train, event_cluster,  left_on='event_id', right_index=True)
+    train = pd.merge(train, event_cluster,  left_on='event_id', right_index=True).sort_index()
     # train.drop('event_id', axis=1, inplace=True)
     # train = train.rename(columns={'clusters': 'event_id'})
 
-    test = pd.merge(test, event_cluster,  left_on='event_id', right_index=True)
+    test = pd.merge(test, event_cluster,  left_on='event_id', right_index=True).sort_index()
     # test.drop('event_id', axis=1, inplace=True)
     # test = test.rename(columns={'clusters': 'event_id'})
 
