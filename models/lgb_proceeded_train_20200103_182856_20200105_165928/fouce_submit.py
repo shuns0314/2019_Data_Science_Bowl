@@ -1,5 +1,5 @@
-# CV: 0.553 LB: 0.519
-# CV: 0.555 LB: 0.527
+# CV: 0.553 LB: 0.519 num_fold = 10
+# CV: 0.555 LB: 0.527 num_fold = 8
 from typing import Tuple
 import random
 from collections import Counter, defaultdict
