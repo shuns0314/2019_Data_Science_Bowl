@@ -244,7 +244,7 @@ def feature_preprocess(df):
                                     4050, 4070, 4080, 4090, 4220, 4095]].sum(axis=1)
     # df['installation_event_code_count_mean'] = df.groupby(['installation_id'])['sum_event_code_count'].transform('mean')
     # df['installation_event_code_count_std'] = df.groupby(['installation_id'])['sum_event_code_count'].transform('std')
-    df.drop('sum_event_code_count', axis=1, inplace=True) 
+    # df.drop('sum_event_code_count', axis=1, inplace=True)
     return df
 
 
