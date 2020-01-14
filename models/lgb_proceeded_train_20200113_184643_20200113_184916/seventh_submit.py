@@ -117,7 +117,7 @@ def preprocess(train: pd.DataFrame,
 
 def encode_title(train_df: pd.DataFrame,
                  test_df: pd.DataFrame
-                 ) -> Tuple[pd.DataFrame, pd.DataFrame]:
+                 ) -> dict:
     """各DataFrameのtitleを番号に変換するためのmethod.
 
     return:
