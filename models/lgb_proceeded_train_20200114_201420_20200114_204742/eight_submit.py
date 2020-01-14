@@ -1,5 +1,4 @@
-# val_loss(seed=77): 0.5553158540192482
-# val_loss(seed=3):
+# val_loss(seed=3): 0.55192355
 from typing import Tuple, Dict
 import random
 from collections import Counter, defaultdict
@@ -240,7 +239,6 @@ class GetData():
         self.coordinates_y = []
         self.size = []
 
-
     def process(self, user_sample, installation_id):
 
         all_assessments = []
@@ -424,207 +422,6 @@ class GetData():
             cnt += y
         return cnt
 
-    """各installation_idのおける過去のゲームの実績をまとめるmethod."""
-
-    def __init__(self,
-                 win_code,
-                 assess_titles,
-                 list_of_event_code,
-                 list_of_event_id,
-                 list_of_info_clusters,
-                 list_of_args_clusters,
-                 activities_labels,
-                 all_title_event_code,
-                 test_set=False):
-
-        self.win_code = win_code
-        self.assess_titles = assess_titles
-        self.list_of_event_code = list_of_event_code
-        self.list_of_event_id = list_of_event_id
-        self.list_of_info_clusters = list_of_info_clusters
-        self.list_of_args_clusters = list_of_args_clusters
-        self.activities_labels = activities_labels
-        self.all_title_event_code = all_title_event_code
-
-        self.user_activities_count = {
-            'Clip': 0,
-            'Activity': 0,
-            'Assessment': 0,
-            'Game': 0
-            }
-        self.last_activity = 0
-        self.test_set = test_set
-        self.count_actions = 0
-
-        # print(self.list_of_event_code)
-        self.event_code_count: Dict[str, int] = {ev: 0 for ev in self.list_of_event_code}
-        self.event_id_count: Dict[str, int] = {eve: 0 for eve in self.list_of_event_id}
-        self.info_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_info_clusters}
-        self.args_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_args_clusters}
-        self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
-        # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
-
-        self.total_duration = 0
-        self.frequency = 0
-
-        self.game_mean_event_count = 0
-        self.accumulated_game_miss = 0
-
-        self.game_round = []
-        self.game_duration = []
-        self.game_level = []
-
-        self.so_cool = 0
-        self.greatjob = 0
-
-    def process(self, user_sample, installation_id):
-
-        all_assessments = []
-        get_assesments = GetAssessmentFeature(self.win_code,
-                                              self.assess_titles,
-                                              self.list_of_event_code,
-                                              self.list_of_event_id,
-                                              self.list_of_info_clusters,
-                                              self.list_of_args_clusters,
-                                              self.activities_labels,
-                                              self.all_title_event_code,
-                                              test_set=self.test_set)
-        first_session = user_sample.iloc[0, user_sample.columns.get_loc('timestamp')]
-        # まずgame_sessionでgroupbyする
-        for i, (session_id, session) in enumerate(
-                user_sample.groupby('game_session', sort=False)):
-            session_type = session['type'].iloc[0]
-            # print(session_type)
-            # game_session数が1以下を省く
-            if self.test_set is True:
-                second_condition = True
-            else:
-                if len(session) > 1:
-                    second_condition = True
-                else:
-                    second_condition = False
-
-            # gameを初めて開始してからの時間を計測
-            # if i == 0:
-            features: dict = self.user_activities_count.copy()
-
-            if session_type == "Game":
-
-                self.game_mean_event_count = (self.game_mean_event_count + session['event_count'].iloc[-1])/2.0
-
-                game_s = session[session.event_code == 2030]
-                misses_cnt = self.count_miss(game_s)
-                self.accumulated_game_miss += misses_cnt
-
-                try:
-                    game_round_ = json.loads(session['event_data'].iloc[-1])["round"]
-                    self.game_round.append(game_round_)
-
-                except:
-                    pass
-
-                try:
-                    game_duration_ = json.loads(session['event_data'].iloc[-1])["duration"]
-                    self.game_duration.append(game_duration_)
-                except:
-                    pass
-
-                try:
-                    game_level_ = json.loads(session['event_data'].iloc[-1])["level"]
-                    self.game_level.append(game_level_)
-                except:
-                    pass
-
-            if session_type == 'Activity':
-                # 特徴量に前回までのcoolとgreatの数を追加
-                so_cool = session['event_data'].str.contains('SoCool').sum()
-                self.so_cool += so_cool
-
-                greatjob = session['event_data'].str.contains('GreatJob').sum()
-                self.greatjob += greatjob
-
-            # session typeがAssessmentのやつだけ、カウントする。
-            if (session_type == 'Assessment') & (second_condition):
-                features = get_assesments.process(session, features)
-
-                if features is not None:
-                    features['installation_id'] = installation_id
-                    # 特徴量に前回までのゲームの回数を追加
-                    features['count_actions'] = self.count_actions
-
-                    features.update(self.event_code_count.copy())
-                    features.update(self.event_id_count.copy())
-                    features.update(self.info_clusters_count.copy())
-                    features.update(self.args_clusters_count.copy())
-                    features.update(self.title_count.copy())
-                    # features.update(self.title_event_code_count.copy())
-
-                    features['total_duration'] = self.total_duration
-                    features['frequency'] = self.frequency
-
-                    features['game_mean_event_count'] = self.game_mean_event_count
-                    features['accumulated_game_miss'] = self.accumulated_game_miss
-                    features['mean_game_round'] = np.mean(self.game_round) if len(self.game_round) != 0 else 0
-                    features['max_game_round'] = np.max(self.game_round) if len(self.game_round) != 0 else 0
-                    # features['sum_game_round'] = np.max(self.game_round) if len(self.game_round) != 0 else 0
-                    features['mean_game_duration'] = np.mean(self.game_duration) if len(self.game_duration) != 0 else 0
-                    features['max_game_duration'] = np.max(self.game_duration) if len(self.game_duration) != 0 else 0
-                    features['sum_game_duration'] = np.sum(self.game_duration) if len(self.game_duration) != 0 else 0
-                    features['mean_game_level'] = np.mean(self.game_level) if len(self.game_level) != 0 else 0
-                    # features['max_game_level'] = np.max(self.game_level) if len(self.game_level) != 0 else 0
-                    # features['sum_game_level'] = np.sum(self.game_level) if len(self.game_level) != 0 else 0
-
-                    features['so_cool'] = self.so_cool
-                    features['greatjob'] = self.greatjob
-
-                    all_assessments.append(features)
-            # print(session.iloc[-1, session.columns.get_loc('timestamp')])
-            self.total_duration = (session.iloc[-1, session.columns.get_loc('timestamp')] - first_session).seconds
-            self.count_actions += len(session)
-            if self.total_duration == 0:
-                self.frequency = 0
-            else:
-                self.frequency = self.count_actions / self.total_duration
-
-            self.event_code_count = self.update_counters(
-                session, self.event_code_count, "event_code")
-            self.event_id_count = self.update_counters(
-                session, self.event_id_count, "event_id")
-            self.info_clusters_count = self.update_counters(
-                session, self.info_clusters_count, "info_clusters")
-            self.args_clusters_count = self.update_counters(
-                session, self.args_clusters_count, "args_clusters")
-            self.title_count = self.update_counters(
-                session, self.title_count, 'title')
-            # self.title_event_code_count = self.update_counters(
-            #     session, self.title_event_code_count, 'title_event_code')
-
-            # second_conditionがFalseのときは、user_activities_countのみ増える。
-            if self.last_activity != session_type:
-                self.user_activities_count[session_type] += 1
-                self.last_activitiy = session_type
-
-        if self.test_set:
-            return all_assessments[-1]
-        return all_assessments
-
-    def update_counters(self, session, counter: dict, col: str):
-        num_of_session_count = Counter(session[col])
-        for k in num_of_session_count.keys():
-            x = k
-            if col == 'title':
-                x = self.activities_labels[k]
-            counter[x] += num_of_session_count[k]
-        return counter
-
-    def count_miss(self, df):
-        cnt = 0
-        for e in range(len(df)):
-            x = df['event_data'].iloc[e]
-            y = json.loads(x)['misses']
-            cnt += y
-        return cnt
-
 
 class GetAssessmentFeature:
 
@@ -660,6 +457,7 @@ class GetAssessmentFeature:
         self.false_attempts = 0
 
         self.last_accuracy_title = {'acc_' + title: -1 for title in assess_titles}
+
 
 
     def process(self, session, features):
@@ -1019,13 +817,13 @@ def threshold(x, params):
 # train
 ###############################################################################
 
-def train_main(train_df, test_df):
-    """main."""
-    _, pred_df = lgb_regression(train_df, test_df)
-    coefficient = train_df['accuracy_group'].value_counts(sort=False)/len(train_df['accuracy_group'])
-    print(coefficient)
-    pred_df = pred_df.apply(lambda x: x.mode()[0] if len(x.mode()) == 1 else coefficient[x.mode()].idxmax(), axis=1)
-    return pred_df
+# def train_main(train_df, test_df):
+#     """main."""
+#     _, pred_df = lgb_regression(train_df, test_df)
+#     coefficient = train_df['accuracy_group'].value_counts(sort=False)/len(train_df['accuracy_group'])
+#     print(coefficient)
+#     pred_df = pred_df.apply(lambda x: x.mode()[0] if len(x.mode()) == 1 else coefficient[x.mode()].idxmax(), axis=1)
+#     return pred_df
 
 
 def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.DataFrame:
@@ -1037,29 +835,13 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
     groups = np.array(x['installation_id'])
 
     lgb_params = {
-            "objective": "regression",
-            "boosting_type": "gbdt",
-            "metric": 'rmse'
-    }
-
-    # lgb_params = {
-    #         "objective": "regression",
-    #         "boosting_type": "gbdt",
-    #         "metric": 'rmse',
-    #         "verbosity": 0,
-    #         "early_stopping_round": 50,
-    #         "learning_rate": 0.06,
-    #         'max_depth': 8,
-    #         'num_leaves': 28,
-    #         'feature_fraction': 0.4476004530931245,
-    #         'subsample': 0.9,
-    #         'min_child_weight': 1.3110235824824013,
-    #         'colsample_bytree': 0.8,
-    #         'min_gain_to_split': 0.000966661285874846}
+            'objective': 'regression',
+            'metric': 'rmse',
+            }
 
     x = x.drop('installation_id', axis=1)
     # total_pred = np.zeros(y.shape)
-    total_loss = []
+    total_val_pred = np.zeros(y.shape)
     func = np.frompyfunc(threshold, 2, 1)
 
     if test_df is not None:
@@ -1069,9 +851,10 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         print(total_test_pred.shape)
 
     all_importance = []
+    test_index_all = []
 
     for fold_ind, (train_ind, test_ind) in enumerate(
-            stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=SEED)):
+            stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=77)):
         # print(dev_ind)
         x_train = x.iloc[train_ind]
         y_train = y.iloc[train_ind]
@@ -1086,36 +869,39 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         model = lgb.train(params=lgb_params,
                           train_set=lgb_train,
                           valid_sets=lgb_val,
-                          feval=lgb_qwk)
-                          # num_boost_round=1000,
-                          # early_stopping_rounds=50
+                          feval=lgb_qwk,
+                          num_boost_round=1000,
+                          early_stopping_rounds=50)
 
         # y_val_pred = model.predict(x_test, num_iteration=model.best_iteration)
-
-        params = {
-            'threshold_0': 1.12,
-            'threshold_1': 1.62,
-            'threshold_2': 2.20
-            },
         # params = post_processing(y_val, y_val_pred)
         # all_params.append(params)
 
         y_pred = model.predict(x_test, num_iteration=model.best_iteration)
         all_importance.append(pd.DataFrame(model.feature_importance('gain'), index=x_train.columns))
-        y_pred = func(y_pred, params)
 
-        total_loss.append(qwk(y_pred, y_test))
+        total_val_pred[test_ind] = y_pred
+        test_index_all += test_ind
         # total_pred[test_ind] = y_pred
 
         if test_df is not None:
             test_pred = model.predict(
                 test_x, num_iteration=model.best_iteration)
-            test_pred = func(test_pred, params)
             total_test_pred[:, fold_ind] = test_pred
     all_importance = pd.concat(all_importance, axis=1)
 
-    loss = np.mean(total_loss)
-    print(f"val_loss: {loss}")
+    params = {
+        'threshold_0': 1.12,
+        'threshold_1': 1.62,
+        'threshold_2': 2.20
+        },
+    # print(total_val_pred)
+    total_val_pred[test_index_all] = func(total_val_pred[test_index_all], params)
+    loss = qwk(total_val_pred[test_index_all], y[test_index_all].values)
+    print(loss)
+    # print(loss)
+    total_test_pred = total_test_pred.mean(axis=1)
+    total_test_pred = func(total_test_pred, params)
 
     return model, pd.DataFrame(total_test_pred)
 
@@ -1142,7 +928,7 @@ def main():
     print('--train--')
     compiled_train.columns = compiled_train.columns.str.replace(',', '')
     compiled_test.columns = compiled_test.columns.str.replace(',', '')
-    pred_df = train_main(compiled_train, compiled_test)
+    _, pred_df = lgb_regression(compiled_train, compiled_test)
 
     print('--predict--')
     predict_main(pred_df)
