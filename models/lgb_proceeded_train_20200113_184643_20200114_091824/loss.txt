@@ -1,0 +1,2 @@
+val_loss: 0.4986605870819445
+train_csv: lgb_proceeded_train_20200113_184643_20200114_091824
