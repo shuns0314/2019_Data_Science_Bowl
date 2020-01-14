@@ -57,8 +57,16 @@ class GetData():
         self.game_duration = []
         self.game_level = []
 
-        self.so_cool = 0
-        self.greatjob = 0
+        self.good_comment = 0
+        self.coordinates = 0
+        self.coordinates = 0
+        self.description_val = 0
+        self.description = 0
+
+        self.coordinates_x = []
+        self.coordinates_y = []
+        self.size = []
+
 
     def process(self, user_sample, installation_id):
 
@@ -118,13 +126,6 @@ class GetData():
                 except:
                     pass
 
-            if session_type == 'Activity':
-                # 特徴量に前回までのcoolとgreatの数を追加
-                so_cool = session['event_data'].str.contains('SoCool').sum()
-                self.so_cool += so_cool
-
-                greatjob = session['event_data'].str.contains('GreatJob').sum()
-                self.greatjob += greatjob
 
             # session typeがAssessmentのやつだけ、カウントする。
             if (session_type == 'Assessment') & (second_condition):
@@ -153,14 +154,56 @@ class GetData():
                     features['mean_game_duration'] = np.mean(self.game_duration) if len(self.game_duration) != 0 else 0
                     features['max_game_duration'] = np.max(self.game_duration) if len(self.game_duration) != 0 else 0
                     features['sum_game_duration'] = np.sum(self.game_duration) if len(self.game_duration) != 0 else 0
+                    features['std_game_duration'] = np.std(self.game_duration) if len(self.game_duration) != 0 else 0
                     features['mean_game_level'] = np.mean(self.game_level) if len(self.game_level) != 0 else 0
                     # features['max_game_level'] = np.max(self.game_level) if len(self.game_level) != 0 else 0
                     # features['sum_game_level'] = np.sum(self.game_level) if len(self.game_level) != 0 else 0
 
-                    features['so_cool'] = self.so_cool
-                    features['greatjob'] = self.greatjob
+                    features['mean_coordinates_x'] = np.nanmean(self.coordinates_x) if len(self.coordinates_x) != 0 else 0
+                    features['std_coordinates_x'] = np.nanstd(self.coordinates_x) if len(self.coordinates_x) != 0 else 0
+                    features['mean_coordinates_y'] = np.nanmean(self.coordinates_y) if len(self.coordinates_y) != 0 else 0
+                    features['std_coordinates_y'] = np.nanstd(self.coordinates_y) if len(self.coordinates_y) != 0 else 0
+
+                    features['mean_size'] = np.nanmean(self.size) if len(self.size) != 0 else 0
+                    features['max_size'] = np.nanmax(self.size) if len(self.size) != 0 else 0
+
+                    features['good_comment'] = self.good_comment
+
+                    features['description'] = self.description
+                    features['coordinates'] = self.coordinates
+                    features['description_val'] = self.description_val
 
                     all_assessments.append(features)
+
+
+            coordinates = session['event_data'].str.contains('coordinates').sum()
+            self.coordinates += coordinates
+
+            description = session['event_data'].str.contains('description').sum()
+            self.description += description
+
+            event_data = pd.io.json.json_normalize(session.event_data.apply(json.loads))
+            try:
+                self.coordinates_x += (event_data['coordinates.x']/event_data['coordinates.stage_width']).to_list()
+            except:
+                pass
+            try:
+                self.coordinates_y += (event_data['coordinates.y']/event_data['coordinates.stage_height']).to_list()
+            except:
+                pass
+            try:
+                self.size += event_data['size'].to_list()
+            except:
+                pass
+            try:
+                self.description_val = len(set(event_data['description']))
+            except:
+                pass
+            
+            good_comment_list = ['Good', 'good', 'cool', 'Cool', 'Nice', 'nice', 'Great', 'great', 'Amaging']
+            for comment in good_comment_list:
+                self.good_comment += session['event_data'].str.contains(comment).sum()
+
             # print(session.iloc[-1, session.columns.get_loc('timestamp')])
             self.total_duration = (session.iloc[-1, session.columns.get_loc('timestamp')] - first_session).seconds
             self.count_actions += len(session)
