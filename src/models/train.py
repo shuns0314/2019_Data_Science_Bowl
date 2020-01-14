@@ -81,7 +81,7 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
 
     x = x.drop('installation_id', axis=1)
     # total_pred = np.zeros(y.shape)
-    total_loss = []
+    total_val_pred = np.zeros(y.shape)
     func = np.frompyfunc(threshold, 2, 1)
 
     if test_df is not None:
@@ -91,6 +91,7 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         print(total_test_pred.shape)
 
     all_importance = []
+    test_index_all = []
 
     for fold_ind, (train_ind, test_ind) in enumerate(
             stratified_group_k_fold(X=x, y=y, groups=groups, k=num_fold, seed=77)):
@@ -111,30 +112,33 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
                           feval=lgb_qwk)
 
         # y_val_pred = model.predict(x_test, num_iteration=model.best_iteration)
-
-        params = {
-            'threshold_0': 1.12,
-            'threshold_1': 1.62,
-            'threshold_2': 2.20
-            },
         # params = post_processing(y_val, y_val_pred)
         # all_params.append(params)
 
         y_pred = model.predict(x_test, num_iteration=model.best_iteration)
         all_importance.append(pd.DataFrame(model.feature_importance('gain'), index=x_train.columns))
-        y_pred = func(y_pred, params)
 
-        total_loss.append(qwk(y_pred, y_test))
+        total_val_pred[test_ind] = y_pred
+        test_index_all += test_ind
         # total_pred[test_ind] = y_pred
 
         if test_df is not None:
             test_pred = model.predict(
                 test_x, num_iteration=model.best_iteration)
-            test_pred = func(test_pred, params)
             total_test_pred[:, fold_ind] = test_pred
     all_importance = pd.concat(all_importance, axis=1)
-
-    loss = np.mean(total_loss)
+    
+    params = {
+        'threshold_0': 1.12,
+        'threshold_1': 1.62,
+        'threshold_2': 2.20
+        },
+    # print(total_val_pred)
+    total_val_pred[test_index_all] = func(total_val_pred[test_index_all], params)
+    loss = qwk(total_val_pred[test_index_all], y[test_index_all].values)
+    # print(loss)
+    total_test_pred = total_test_pred.mean(axis=1)
+    total_test_pred = func(total_test_pred, params)
 
     if test_df is None:
         return model, all_importance, loss
