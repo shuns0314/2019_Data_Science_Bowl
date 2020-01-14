@@ -69,14 +69,6 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
     lgb_params = {
             'objective': 'regression',
             'metric': 'rmse',
-            "boosting_type": "gbdt",
-            'max_depth': 7,
-            'num_leaves': 47,
-            'feature_fraction': 0.5379514550999258,
-            'subsample': 0.7,
-            'min_child_weight': 0.37741036657173554,
-            'colsample_bytree': 0.8,
-            'min_gain_to_split': 0.00015661023920067888
             }
 
     x = x.drop('installation_id', axis=1)
