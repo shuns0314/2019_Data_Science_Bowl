@@ -45,7 +45,7 @@ class GetData():
         self.info_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_info_clusters}
         self.args_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_args_clusters}
         self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
-        # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
+        self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
 
         self.total_duration = 0
         self.frequency = 0
@@ -141,7 +141,7 @@ class GetData():
                     features.update(self.info_clusters_count.copy())
                     features.update(self.args_clusters_count.copy())
                     features.update(self.title_count.copy())
-                    # features.update(self.title_event_code_count.copy())
+                    features.update(self.title_event_code_count.copy())
 
                     features['total_duration'] = self.total_duration
                     features['frequency'] = self.frequency
@@ -222,8 +222,8 @@ class GetData():
                 session, self.args_clusters_count, "args_clusters")
             self.title_count = self.update_counters(
                 session, self.title_count, 'title')
-            # self.title_event_code_count = self.update_counters(
-            #     session, self.title_event_code_count, 'title_event_code')
+            self.title_event_code_count = self.update_counters(
+                session, self.title_event_code_count, 'title_event_code')
 
             # second_conditionがFalseのときは、user_activities_countのみ増える。
             if self.last_activity != session_type:
