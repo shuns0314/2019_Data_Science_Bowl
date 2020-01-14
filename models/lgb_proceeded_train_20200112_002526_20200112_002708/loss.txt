@@ -1,3 +1,0 @@
-val_loss: 0.5351377882405554
-train_csv: lgb_proceeded_train_20200112_002526_20200112_002708
-tf_idf event: 9

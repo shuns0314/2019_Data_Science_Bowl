@@ -109,7 +109,9 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         model = lgb.train(params=lgb_params,
                           train_set=lgb_train,
                           valid_sets=lgb_val,
-                          feval=lgb_qwk)
+                          feval=lgb_qwk,
+                          num_boost_round=1000,
+                          early_stopping_rounds=50)
 
         # y_val_pred = model.predict(x_test, num_iteration=model.best_iteration)
         # params = post_processing(y_val, y_val_pred)
