@@ -45,7 +45,7 @@ class GetData():
         self.info_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_info_clusters}
         self.args_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_args_clusters}
         self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
-        self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
+        # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
 
         self.total_duration = 0
         self.frequency = 0
@@ -141,7 +141,7 @@ class GetData():
                     features.update(self.info_clusters_count.copy())
                     features.update(self.args_clusters_count.copy())
                     features.update(self.title_count.copy())
-                    features.update(self.title_event_code_count.copy())
+                    #  features.update(self.title_event_code_count.copy())
 
                     features['total_duration'] = self.total_duration
                     features['frequency'] = self.frequency
@@ -199,7 +199,7 @@ class GetData():
                 self.description_val = len(set(event_data['description']))
             except:
                 pass
-            
+
             good_comment_list = ['Good', 'good', 'cool', 'Cool', 'Nice', 'nice', 'Great', 'great', 'Amaging']
             for comment in good_comment_list:
                 self.good_comment += session['event_data'].str.contains(comment).sum()
@@ -222,8 +222,8 @@ class GetData():
                 session, self.args_clusters_count, "args_clusters")
             self.title_count = self.update_counters(
                 session, self.title_count, 'title')
-            self.title_event_code_count = self.update_counters(
-                session, self.title_event_code_count, 'title_event_code')
+            # self.title_event_code_count = self.update_counters(
+            #     session, self.title_event_code_count, 'title_event_code')
 
             # second_conditionがFalseのときは、user_activities_countのみ増える。
             if self.last_activity != session_type:
@@ -347,9 +347,14 @@ class GetAssessmentFeature:
         if self.durations == []:
             df['duration_mean'] = 0
             df['duration_max'] = 0
+            df['duration_std'] = 0
+            df['duration_median'] = 0
+
         else:
             df['duration_mean'] = np.mean(self.durations)
             df['duration_max'] = np.max(self.durations)
+            df['duration_std'] = np.std(self.durations)
+            df['duration_median'] = np.median(self.durations)
 
         self.durations.append(
             (session.iloc[-1, session.columns.get_loc('timestamp')] - session.iloc[0, session.columns.get_loc('timestamp')]).seconds
