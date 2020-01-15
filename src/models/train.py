@@ -90,8 +90,6 @@ def lgb_regression(train_df: pd.DataFrame, test_df: pd.DataFrame = None) -> pd.D
         # print(dev_ind)
         x_train = x.iloc[train_ind]
         y_train = y.iloc[train_ind]
-        # x_val = x.iloc[val_ind]
-        # y_val = y.iloc[val_ind]
         x_test = x.iloc[test_ind]
         y_test = y.iloc[test_ind]
 
