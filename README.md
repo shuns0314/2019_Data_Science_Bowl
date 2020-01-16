@@ -26,5 +26,5 @@
 
 ## 環境構築
 1. kaggle.jsonを一番上のフォルダ上に配置する。
-2. docker-compose up app
+2. docker-compose up
 3. docker-compose run app -d /bin/bash

@@ -4,6 +4,7 @@ from collections import Counter, defaultdict
 
 
 def stratified_group_k_fold(X, y, groups, k, seed=None):
+    np.random.seed(seed)
     # ラベルの数をカウント
     labels_num = np.max(y) + 1
     # 各グループのラベルの数をカウントする
@@ -43,17 +44,29 @@ def stratified_group_k_fold(X, y, groups, k, seed=None):
 
     for i in range(k):
         test_k = i
-        val_k = i+1 if i+1 != k else 0
-        print(val_k)
-        train_groups = all_groups - groups_per_fold[test_k] - groups_per_fold[val_k]
-        val_groups = groups_per_fold[val_k]
+        # val_k = i+1 if i+1 != k else 0
+        # print(val_k)
+        train_groups = all_groups - groups_per_fold[test_k]  #  - groups_per_fold[val_k]
+        # val_groups = groups_per_fold[val_k]
         test_groups = groups_per_fold[test_k]
-
+        # print(test_groups)
         train_indices = [i for i, g in enumerate(groups) if g in train_groups]
-        val_indices = [i for i, g in enumerate(groups) if g in val_groups]
-        test_indices = [i for i, g in enumerate(groups) if g in test_groups]
+        # val_indices = [i for i, g in enumerate(groups) if g in val_groups]
+        # test_indices = {str(g): [i for i, g in enumerate(groups) if g in test_groups]}
 
-        yield train_indices, val_indices, test_indices
+        test_indices = []
+        n_g = None
+        test_list = []
+        for i, g in enumerate(groups):
+            if g in test_groups:
+                if n_g is not None and n_g != g:
+                    test_indices.append(test_list)
+                    test_list = []
+                test_list.append(i)
+                n_g = g
+
+        test_indices = [np.random.choice(i) for i in test_indices]
+        yield train_indices, test_indices  # val_indices,
 
 
 def get_distribution(y_vals):

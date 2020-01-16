@@ -1,6 +1,19 @@
 import numpy as np
 
 
+def lgb_qwk(preds, data):
+    params = {
+        'threshold_0': 1.12,
+        'threshold_1': 1.62,
+        'threshold_2': 2.20
+        },
+
+    func = np.frompyfunc(threshold, 2, 1)
+    test_pred = func(preds, params)
+    loss = qwk(test_pred, data.get_label())
+    return 'qwk', loss, True
+
+
 def qwk(a1, a2):
     """
     Source:
@@ -33,3 +46,15 @@ def qwk(a1, a2):
     e = e / a1.shape[0]
 
     return 1 - o / e
+
+
+def threshold(x, params):
+    if x < params['threshold_0']:
+        y = 0
+    elif x < params['threshold_1']:
+        y = 1
+    elif x < params['threshold_2']:
+        y = 2
+    else:
+        y = 3
+    return y
