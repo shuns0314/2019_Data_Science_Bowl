@@ -18,6 +18,10 @@ class GetData():
                  list_of_args_clusters,
                  activities_labels,
                  all_title_event_code,
+                 list_of_date,
+                 list_of_month,
+                 list_of_hour,
+                 list_of_dayofweek,
                  test_set=False):
 
         self.win_code = win_code
@@ -28,6 +32,10 @@ class GetData():
         self.list_of_args_clusters = list_of_args_clusters
         self.activities_labels = activities_labels
         self.all_title_event_code = all_title_event_code
+        self.list_of_date = list_of_date
+        self.list_of_month = list_of_month
+        self.list_of_hour = list_of_hour
+        self.list_of_dayofweek = list_of_dayofweek
 
         self.user_activities_count = {
             'Clip': 0,
@@ -35,6 +43,14 @@ class GetData():
             'Assessment': 0,
             'Game': 0
             }
+
+        self.nearly_user_activities_count = {
+            'nearly_Clip': 0,
+            'nearly_Activity': 0,
+            'nearly_Assessment': 0,
+            'nearly_Game': 0
+            }
+
         self.last_activity = 0
         self.test_set = test_set
         self.count_actions = 0
@@ -46,6 +62,10 @@ class GetData():
         self.args_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_args_clusters}
         self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
         # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
+        self.date_count: Dict[str, int] = {f'date_{eve}': 0 for eve in self.list_of_date}
+        self.month_count: Dict[str, int] = {f'month_{eve}': 0 for eve in self.list_of_month}
+        self.hour_count: Dict[str, int] = {f'hour_{eve}': 0 for eve in self.list_of_hour}
+        self.dayofweek_count: Dict[str, int] = {f'dayofweek_{eve}': 0 for eve in self.list_of_dayofweek}
 
         self.total_duration = 0
         self.frequency = 0
@@ -57,8 +77,16 @@ class GetData():
         self.game_duration = []
         self.game_level = []
 
-        self.so_cool = 0
-        self.greatjob = 0
+        self.good_comment = 0
+        self.coordinates = 0
+        self.coordinates = 0
+        self.description_val = 0
+        self.description = 0
+
+        self.coordinates_x = []
+        self.coordinates_y = []
+        self.size = []
+
 
     def process(self, user_sample, installation_id):
 
@@ -118,13 +146,6 @@ class GetData():
                 except:
                     pass
 
-            if session_type == 'Activity':
-                # 特徴量に前回までのcoolとgreatの数を追加
-                so_cool = session['event_data'].str.contains('SoCool').sum()
-                self.so_cool += so_cool
-
-                greatjob = session['event_data'].str.contains('GreatJob').sum()
-                self.greatjob += greatjob
 
             # session typeがAssessmentのやつだけ、カウントする。
             if (session_type == 'Assessment') & (second_condition):
@@ -139,8 +160,14 @@ class GetData():
                     features.update(self.event_id_count.copy())
                     features.update(self.info_clusters_count.copy())
                     features.update(self.args_clusters_count.copy())
+                    features.update(self.date_count.copy())
+                    features.update(self.month_count.copy())
+                    features.update(self.hour_count.copy())
+                    features.update(self.dayofweek_count.copy())
+                    features.update(self.nearly_user_activities_count.copy())
+
                     features.update(self.title_count.copy())
-                    # features.update(self.title_event_code_count.copy())
+                    #  features.update(self.title_event_code_count.copy())
 
                     features['total_duration'] = self.total_duration
                     features['frequency'] = self.frequency
@@ -153,14 +180,56 @@ class GetData():
                     features['mean_game_duration'] = np.mean(self.game_duration) if len(self.game_duration) != 0 else 0
                     features['max_game_duration'] = np.max(self.game_duration) if len(self.game_duration) != 0 else 0
                     features['sum_game_duration'] = np.sum(self.game_duration) if len(self.game_duration) != 0 else 0
+                    features['std_game_duration'] = np.std(self.game_duration) if len(self.game_duration) != 0 else 0
                     features['mean_game_level'] = np.mean(self.game_level) if len(self.game_level) != 0 else 0
                     # features['max_game_level'] = np.max(self.game_level) if len(self.game_level) != 0 else 0
                     # features['sum_game_level'] = np.sum(self.game_level) if len(self.game_level) != 0 else 0
 
-                    features['so_cool'] = self.so_cool
-                    features['greatjob'] = self.greatjob
+                    features['mean_coordinates_x'] = np.nanmean(self.coordinates_x) if len(self.coordinates_x) != 0 else 0
+                    features['std_coordinates_x'] = np.nanstd(self.coordinates_x) if len(self.coordinates_x) != 0 else 0
+                    features['mean_coordinates_y'] = np.nanmean(self.coordinates_y) if len(self.coordinates_y) != 0 else 0
+                    features['std_coordinates_y'] = np.nanstd(self.coordinates_y) if len(self.coordinates_y) != 0 else 0
+
+                    features['mean_size'] = np.nanmean(self.size) if len(self.size) != 0 else 0
+                    features['max_size'] = np.nanmax(self.size) if len(self.size) != 0 else 0
+
+                    features['good_comment'] = self.good_comment
+
+                    features['description'] = self.description
+                    features['coordinates'] = self.coordinates
+                    features['description_val'] = self.description_val
 
                     all_assessments.append(features)
+
+
+            coordinates = session['event_data'].str.contains('coordinates').sum()
+            self.coordinates += coordinates
+
+            description = session['event_data'].str.contains('description').sum()
+            self.description += description
+
+            event_data = pd.io.json.json_normalize(session.event_data.apply(json.loads))
+            try:
+                self.coordinates_x += (event_data['coordinates.x']/event_data['coordinates.stage_width']).to_list()
+            except:
+                pass
+            try:
+                self.coordinates_y += (event_data['coordinates.y']/event_data['coordinates.stage_height']).to_list()
+            except:
+                pass
+            try:
+                self.size += event_data['size'].to_list()
+            except:
+                pass
+            try:
+                self.description_val = len(set(event_data['description']))
+            except:
+                pass
+
+            good_comment_list = ['Good', 'good', 'cool', 'Cool', 'Nice', 'nice', 'Great', 'great', 'Amaging']
+            for comment in good_comment_list:
+                self.good_comment += session['event_data'].str.contains(comment).sum()
+
             # print(session.iloc[-1, session.columns.get_loc('timestamp')])
             self.total_duration = (session.iloc[-1, session.columns.get_loc('timestamp')] - first_session).seconds
             self.count_actions += len(session)
@@ -179,11 +248,23 @@ class GetData():
                 session, self.args_clusters_count, "args_clusters")
             self.title_count = self.update_counters(
                 session, self.title_count, 'title')
+            self.date_count = self.update_counters(
+                session, self.date_count, "date")
+            self.month_count = self.update_counters(
+                session, self.month_count, "month")
+            self.hour_count = self.update_counters(
+                session, self.hour_count, "hour")
+            self.dayofweek_count = self.update_counters(
+                session, self.dayofweek_count, "dayofweek")
+
             # self.title_event_code_count = self.update_counters(
             #     session, self.title_event_code_count, 'title_event_code')
 
             # second_conditionがFalseのときは、user_activities_countのみ増える。
             if self.last_activity != session_type:
+                self.nearly_user_activities_count *= 0.8
+                self.nearly_user_activities_count[f'nearly_{session_type}'] += 1
+
                 self.user_activities_count[session_type] += 1
                 self.last_activitiy = session_type
 
@@ -197,6 +278,8 @@ class GetData():
             x = k
             if col == 'title':
                 x = self.activities_labels[k]
+            if col in ['hour', 'month', 'date', 'dayofweek']:
+                x = f'{col}_{x}'
             counter[x] += num_of_session_count[k]
         return counter
 
@@ -232,7 +315,7 @@ class GetAssessmentFeature:
 
         self.test_set = test_set
         self.win_code = win_code
-        self.accuracy_groups = {0: 0, 1: 0, 2: 0, 3: 0}
+        self.accuracy_groups = {'acc_0': 0, 'acc_1': 0, 'acc_2': 0, 'acc_3': 0}
         self.mean_accuracy_group = 0  # accuracy_groupsの平均
         self.count_accuracy = 0
         self.count_correct_attempts = 0  # 成功
@@ -285,7 +368,7 @@ class GetAssessmentFeature:
         # 特徴量に前回までのacc_groupの数を追加
         features.update(self.accuracy_groups)
         self.mean_accuracy_group += features['accuracy_group']
-        self.accuracy_groups[features['accuracy_group']] += 1
+        self.accuracy_groups[f"acc_{features['accuracy_group']}"] += 1
 
         self.counter += 1
 
@@ -304,9 +387,14 @@ class GetAssessmentFeature:
         if self.durations == []:
             df['duration_mean'] = 0
             df['duration_max'] = 0
+            df['duration_std'] = 0
+            df['duration_median'] = 0
+
         else:
             df['duration_mean'] = np.mean(self.durations)
             df['duration_max'] = np.max(self.durations)
+            df['duration_std'] = np.std(self.durations)
+            df['duration_median'] = np.median(self.durations)
 
         self.durations.append(
             (session.iloc[-1, session.columns.get_loc('timestamp')] - session.iloc[0, session.columns.get_loc('timestamp')]).seconds

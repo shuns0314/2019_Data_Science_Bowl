@@ -1,4 +1,0 @@
-val_loss: 0.5497448540484626
-train_csv: lgb_proceeded_train_20200112_133047_20200112_133122
-info_cluster_num=10,
-args_cluster_num=25,
