@@ -18,6 +18,10 @@ class GetData():
                  list_of_args_clusters,
                  activities_labels,
                  all_title_event_code,
+                 list_of_date,
+                 list_of_month,
+                 list_of_hour,
+                 list_of_dayofweek,
                  test_set=False):
 
         self.win_code = win_code
@@ -28,6 +32,10 @@ class GetData():
         self.list_of_args_clusters = list_of_args_clusters
         self.activities_labels = activities_labels
         self.all_title_event_code = all_title_event_code
+        self.list_of_date = list_of_date
+        self.list_of_month = list_of_month
+        self.list_of_hour = list_of_hour
+        self.list_of_dayofweek = list_of_dayofweek
 
         self.user_activities_count = {
             'Clip': 0,
@@ -35,6 +43,14 @@ class GetData():
             'Assessment': 0,
             'Game': 0
             }
+
+        self.nearly_user_activities_count = {
+            'nearly_Clip': 0,
+            'nearly_Activity': 0,
+            'nearly_Assessment': 0,
+            'nearly_Game': 0
+            }
+
         self.last_activity = 0
         self.test_set = test_set
         self.count_actions = 0
@@ -46,6 +62,10 @@ class GetData():
         self.args_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_args_clusters}
         self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
         # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
+        self.date_count: Dict[str, int] = {f'date_{eve}': 0 for eve in self.list_of_date}
+        self.month_count: Dict[str, int] = {f'month_{eve}': 0 for eve in self.list_of_month}
+        self.hour_count: Dict[str, int] = {f'hour_{eve}': 0 for eve in self.list_of_hour}
+        self.dayofweek_count: Dict[str, int] = {f'dayofweek_{eve}': 0 for eve in self.list_of_dayofweek}
 
         self.total_duration = 0
         self.frequency = 0
@@ -140,6 +160,12 @@ class GetData():
                     features.update(self.event_id_count.copy())
                     features.update(self.info_clusters_count.copy())
                     features.update(self.args_clusters_count.copy())
+                    features.update(self.date_count.copy())
+                    features.update(self.month_count.copy())
+                    features.update(self.hour_count.copy())
+                    features.update(self.dayofweek_count.copy())
+                    features.update(self.nearly_user_activities_count.copy())
+
                     features.update(self.title_count.copy())
                     #  features.update(self.title_event_code_count.copy())
 
@@ -222,11 +248,23 @@ class GetData():
                 session, self.args_clusters_count, "args_clusters")
             self.title_count = self.update_counters(
                 session, self.title_count, 'title')
+            self.date_count = self.update_counters(
+                session, self.date_count, "date")
+            self.month_count = self.update_counters(
+                session, self.month_count, "month")
+            self.hour_count = self.update_counters(
+                session, self.hour_count, "hour")
+            self.dayofweek_count = self.update_counters(
+                session, self.dayofweek_count, "dayofweek")
+
             # self.title_event_code_count = self.update_counters(
             #     session, self.title_event_code_count, 'title_event_code')
 
             # second_conditionがFalseのときは、user_activities_countのみ増える。
             if self.last_activity != session_type:
+                self.nearly_user_activities_count *= 0.8
+                self.nearly_user_activities_count[f'nearly_{session_type}'] += 1
+
                 self.user_activities_count[session_type] += 1
                 self.last_activitiy = session_type
 
@@ -240,6 +278,8 @@ class GetData():
             x = k
             if col == 'title':
                 x = self.activities_labels[k]
+            if col in ['hour', 'month', 'date', 'dayofweek']:
+                x = f'{col}_{x}'
             counter[x] += num_of_session_count[k]
         return counter
 
@@ -275,7 +315,7 @@ class GetAssessmentFeature:
 
         self.test_set = test_set
         self.win_code = win_code
-        self.accuracy_groups = {0: 0, 1: 0, 2: 0, 3: 0}
+        self.accuracy_groups = {'acc_0': 0, 'acc_1': 0, 'acc_2': 0, 'acc_3': 0}
         self.mean_accuracy_group = 0  # accuracy_groupsの平均
         self.count_accuracy = 0
         self.count_correct_attempts = 0  # 成功
@@ -328,7 +368,7 @@ class GetAssessmentFeature:
         # 特徴量に前回までのacc_groupの数を追加
         features.update(self.accuracy_groups)
         self.mean_accuracy_group += features['accuracy_group']
-        self.accuracy_groups[features['accuracy_group']] += 1
+        self.accuracy_groups[f"acc_{features['accuracy_group']}"] += 1
 
         self.counter += 1
 
