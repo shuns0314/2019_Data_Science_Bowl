@@ -1,4 +1,5 @@
-# val_loss(seed=3): 0.55192355
+# val_loss(seed=3): 0.5612112108318326
+
 from typing import Tuple, Dict
 import random
 from collections import Counter, defaultdict
