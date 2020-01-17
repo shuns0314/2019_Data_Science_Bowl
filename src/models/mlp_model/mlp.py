@@ -1,72 +1,87 @@
 import numpy as np
 import pandas as pd
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+
+# Importa os pacotes de algoritmos de redes neurais (Keras)
+from keras.layers import Dense, Input, Dropout, BatchNormalization
+from keras.models import Model
+from keras.callbacks import EarlyStopping, ModelCheckpoint
+import keras.backend as K
+from sklearn.utils import class_weight
+
+from loss_function import qwk, threshold
 
 
 COLUMNS_NUM = 512
 EPOCH_NUM = 30
-
-def mlp(train: pd.DataFrame, val: pd.DataFrame):
-    train_loader = torch.utils.data.DataLoader(
-        dataset=train,
-        batch_size=64,
-        shuffle=True,
-        num_workers=2)
-    val_loader = torch.utils.data.DataLoader(
-        dataset=val,
-        batch_size=64,
-        shuffle=False,
-        num_workers=2)
-    
-    net = MLPNet()
-
-    for epoch in range(EPOCH_NUM):
-        train_loss, train_acc, val_loss, val_acc = 0, 0, 0, 0
-
-        # ======== train_mode ======
-        net.train()
-        for i, (images, labels) in enumerate(train_loader):
-            images, labels = images.view(-1, 28*28*1).to(device), labels.to(device)
-            optimizer.zero_grad()  # 勾配リセット
-            outputs = net(images)  # 順伝播の計算
-            loss = criterion(outputs, labels)  # lossの計算
-            train_loss += loss.item()  # train_loss に結果を蓄積
-            acc = (outputs.max(1)[1] == labels).sum()  #  予測とラベルが合っている数の合計
-            train_acc += acc.item()  # train_acc に結果を蓄積
-            loss.backward()  # 逆伝播の計算        
-            optimizer.step()  # 重みの更新
-            avg_train_loss = train_loss / len(train_loader.dataset)  # lossの平均を計算
-            avg_train_acc = train_acc / len(train_loader.dataset)  # accの平均を計算
-        
-        # ======== valid_mode ======
-        net.eval()
-        with torch.no_grad():  # 必要のない計算を停止
-        for images, labels in valid_loader:        
-            images, labels = images.view(-1, 28*28*1).to(device), labels.to(device)
-            outputs = net(images)
-            loss = criterion(outputs, labels)
-            val_loss += loss.item()
-            acc = (outputs.max(1)[1] == labels).sum()
-            val_acc += acc.item()
-        avg_val_loss = val_loss / len(valid_loader.dataset)
-        avg_val_acc = val_acc / len(valid_loader.dataset)
+PARAMS = {
+    'threshold_0': 1.12,
+    'threshold_1': 1.62,
+    'threshold_2': 2.20
+    }
 
 
-class MLPNet(nn.Module):
-    def __init__(self):
-        super(MLPNet, self).__init__()
-        self.fc1 = nn.Linear(COLUMNS_NUM, 512)
-        self.fc2 = nn.Linear(512, 64)
-        self.fc3 = nn.Linear(64, 1)
-        self.dropout1 = nn.Dropout(0.2)
-        self.dropout2 = nn.Dropout(0.2)
+class MLPModel:
 
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = self.dropout1(x)
-        x = F.relu(self.fc2(x))
-        x = self.dropout2(x)
-        x = self.fc3(x)
-        return x
+    def __init__(self, y: pd.Series):
+        self.y = y
+
+    def calc_class_weight(self):
+        class_weight_y = class_weight.compute_class_weight(
+            'balanced', np.unique(self.y), self.y)
+        return class_weight_y
+
+    def get_nn(self, x_tr, y_tr, x_val, y_val, shape, class_weight_y):
+        K.clear_session()
+
+        inp = Input(shape=(x_tr.shape[1],))
+
+        x = Dense(1024, input_dim=x_tr.shape[1], activation='relu')(inp)
+        x = Dropout(0.5)(x)
+        x = BatchNormalization()(x)
+
+        x = Dense(512, activation='relu')(x)
+        x = Dropout(0.5)(x)
+        x = BatchNormalization()(x)
+
+        x = Dense(256, activation='relu')(x)
+        x = Dropout(0.5)(x)
+        x = BatchNormalization()(x)
+
+        out = Dense(1)(x)
+
+        model = Model(inp, out)
+        model.compile(optimizer='Adam',
+                      loss='mse')
+
+        es = EarlyStopping(monitor='val_loss',
+                           mode='min',
+                           restore_best_weights=True,
+                           verbose=1,
+                           patience=20)
+
+        mc = ModelCheckpoint('best_model.h5',
+                             monitor='val_loss',
+                             mode='min',
+                             save_best_only=True,
+                             verbose=1,
+                             save_weights_only=True)
+
+        class_weight_y = self.calc_class_weight()
+        model.fit(x_tr, y_tr,
+                  validation_data=[x_val, y_val],
+                  callbacks=[es, mc],
+                  epochs=100,
+                  batch_size=128,
+                  verbose=1,
+                  class_weight=class_weight_y,
+                  shuffle=True)
+
+        model.load_weights("best_model.h5")
+
+        y_pred = model.predict(x_val)
+
+        func = np.frompyfunc(threshold, 2, 1)
+        test_pred = func(y_pred, PARAMS)
+        loss = qwk(test_pred, y_val)
+        print(loss[0])
+        return model, loss
