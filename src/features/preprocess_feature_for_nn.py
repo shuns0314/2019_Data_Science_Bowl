@@ -31,7 +31,7 @@ CATEGORICAL_FEATURES = [
 
 class PreprocessForNN:
 
-    def process(train: pd.DataFrame, test: pd.DataFrame):
+    def process(self, train: pd.DataFrame, test: pd.DataFrame):
 
         train = train[EFFECTIVE_FEATURES]
         test = test[EFFECTIVE_FEATURES]
