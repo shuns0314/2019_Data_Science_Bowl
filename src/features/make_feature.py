@@ -32,8 +32,8 @@ class GetData():
         self.list_of_args_clusters = list_of_args_clusters
         self.activities_labels = activities_labels
         self.all_title_event_code = all_title_event_code
-        self.list_of_date = list_of_date
-        self.list_of_month = list_of_month
+        # self.list_of_date = list_of_date
+        # self.list_of_month = list_of_month
         self.list_of_hour = list_of_hour
         self.list_of_dayofweek = list_of_dayofweek
 
@@ -44,12 +44,12 @@ class GetData():
             'Game': 0
             }
 
-        self.nearly_user_activities_count = {
-            'nearly_Clip': 0,
-            'nearly_Activity': 0,
-            'nearly_Assessment': 0,
-            'nearly_Game': 0
-            }
+        # self.nearly_user_activities_count = {
+        #     'nearly_Clip': 0,
+        #     'nearly_Activity': 0,
+        #     'nearly_Assessment': 0,
+        #     'nearly_Game': 0
+        #     }
 
         self.last_activity = 0
         self.test_set = test_set
@@ -62,8 +62,8 @@ class GetData():
         self.args_clusters_count: Dict[str, int] = {eve: 0 for eve in self.list_of_args_clusters}
         self.title_count: Dict[str, int] = {eve: 0 for eve in self.activities_labels.values()}
         # self.title_event_code_count: Dict[str, int] = {t_eve: 0 for t_eve in self.all_title_event_code}
-        self.date_count: Dict[str, int] = {f'date_{eve}': 0 for eve in self.list_of_date}
-        self.month_count: Dict[str, int] = {f'month_{eve}': 0 for eve in self.list_of_month}
+        # self.date_count: Dict[str, int] = {f'date_{eve}': 0 for eve in self.list_of_date}
+        # self.month_count: Dict[str, int] = {f'month_{eve}': 0 for eve in self.list_of_month}
         self.hour_count: Dict[str, int] = {f'hour_{eve}': 0 for eve in self.list_of_hour}
         self.dayofweek_count: Dict[str, int] = {f'dayofweek_{eve}': 0 for eve in self.list_of_dayofweek}
 
@@ -86,7 +86,6 @@ class GetData():
         self.coordinates_x = []
         self.coordinates_y = []
         self.size = []
-
 
     def process(self, user_sample, installation_id):
 
@@ -160,8 +159,8 @@ class GetData():
                     features.update(self.event_id_count.copy())
                     features.update(self.info_clusters_count.copy())
                     features.update(self.args_clusters_count.copy())
-                    features.update(self.date_count.copy())
-                    features.update(self.month_count.copy())
+                    # features.update(self.date_count.copy())
+                    # features.update(self.month_count.copy())
                     features.update(self.hour_count.copy())
                     features.update(self.dayofweek_count.copy())
                     features.update(self.nearly_user_activities_count.copy())
@@ -248,10 +247,10 @@ class GetData():
                 session, self.args_clusters_count, "args_clusters")
             self.title_count = self.update_counters(
                 session, self.title_count, 'title')
-            self.date_count = self.update_counters(
-                session, self.date_count, "date")
-            self.month_count = self.update_counters(
-                session, self.month_count, "month")
+            # self.date_count = self.update_counters(
+            #     session, self.date_count, "date")
+            # self.month_count = self.update_counters(
+            #     session, self.month_count, "month")
             self.hour_count = self.update_counters(
                 session, self.hour_count, "hour")
             self.dayofweek_count = self.update_counters(
@@ -262,8 +261,8 @@ class GetData():
 
             # second_conditionがFalseのときは、user_activities_countのみ増える。
             if self.last_activity != session_type:
-                self.nearly_user_activities_count *= 0.8
-                self.nearly_user_activities_count[f'nearly_{session_type}'] += 1
+                # self.nearly_user_activities_count *= 0.8
+                # self.nearly_user_activities_count[f'nearly_{session_type}'] += 1
 
                 self.user_activities_count[session_type] += 1
                 self.last_activitiy = session_type
@@ -326,8 +325,6 @@ class GetAssessmentFeature:
         self.false_attempts = 0
 
         self.last_accuracy_title = {'acc_' + title: -1 for title in assess_titles}
-
-
 
     def process(self, session, features):
         all_attempts = session.query(
