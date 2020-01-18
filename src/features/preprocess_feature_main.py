@@ -8,7 +8,7 @@ EVENT_ID_LIST = ["c51d8688", "d51b1749", "cf82af56", "30614231", "f93fc684", "1b
 EVENT_CODE_LIST  = [2050, 4100, 4230, 5000, 4235, 2060, 4110, 5010, 2070, 2075, 2080, 2081, 2083, 3110, 4010, 3120, 3121, 4020, 4021, 
                     4022, 4025, 4030, 4031, 3010, 4035, 4040, 3020, 3021, 4045, 2000, 2010, 2020, 4070, 2025, 2030, 4080, 2035, 
                     2040, 4090, 4220, 4095]
-TITLE_LIST = ["All Star Sorting","Welcome to Lost Lagoon!","Scrub-A-Dub","Costume Box","Magma Peak - Level 1","Bubble Bath","Crystal Caves - Level 2","Tree Top City - Level 3","Slop Problem","Happy Camel","Dino Drink","Watering Hole (Activity)","Heavy"," Heavier"," Heaviest","Honey Cake","Crystal Caves - Level 1","Air Show","Chicken Balancer (Activity)","Flower Waterer (Activity)","Cart Balancer (Assessment)","Mushroom Sorter (Assessment)","Leaf Leader","Dino Dive","Pan Balance","Cauldron Filler (Assessment)","Treasure Map","Crystals Rule","Lifting Heavy Things","Rulers","Fireworks (Activity)","Pirate's Tale","12 Monkeys","Balancing Act","Bottle Filler (Activity)","Chest Sorter (Assessment)","Sandcastle Builder (Activity)","Crystal Caves - Level 3","Egg Dropper (Activity)","Magma Peak - Level 2","Tree Top City - Level 2","Ordering Spheres","Chow Time","Bug Measurer (Activity)","Bird Measurer (Assessment)","Tree Top City - Level 1"]
+TITLE_LIST = ["All Star Sorting","Welcome to Lost Lagoon!","Scrub-A-Dub","Costume Box","Magma Peak - Level 1","Bubble Bath","Crystal Caves - Level 2","Tree Top City - Level 3","Slop Problem","Happy Camel","Dino Drink","Watering Hole (Activity)","Heavy Heavier Heaviest","Honey Cake","Crystal Caves - Level 1","Air Show","Chicken Balancer (Activity)","Flower Waterer (Activity)","Cart Balancer (Assessment)","Mushroom Sorter (Assessment)","Leaf Leader","Dino Dive","Pan Balance","Cauldron Filler (Assessment)","Treasure Map","Crystals Rule","Lifting Heavy Things","Rulers","Fireworks (Activity)","Pirate's Tale","12 Monkeys","Balancing Act","Bottle Filler (Activity)","Chest Sorter (Assessment)","Sandcastle Builder (Activity)","Crystal Caves - Level 3","Egg Dropper (Activity)","Magma Peak - Level 2","Tree Top City - Level 2","Ordering Spheres","Chow Time","Bug Measurer (Activity)","Bird Measurer (Assessment)","Tree Top City - Level 1"]
 
 
 class MutualPreprocessFeatures:
@@ -163,3 +163,46 @@ class PreprocessFeatures:
             y=6
         return y
 
+
+class PreprocessTime:
+
+    def process(self, df):
+        lank = 5
+        new_columns = [f'event_id_lank{i}' for i in range(lank)]
+        df[new_columns] = self.best_columns(df=df, lank=lank, columns=EVENT_ID_LIST)
+        df.drop(EVENT_ID_LIST, axis=1, inplace=True)
+
+        new_columns = [f'EVENT_CODE_LIST_lank{i}' for i in range(lank)]
+        df[new_columns] = self.best_columns(df=df, lank=lank, columns=[str(i) for i in EVENT_CODE_LIST])
+        df.drop([str(i) for i in EVENT_CODE_LIST], axis=1, inplace=True)
+
+        new_columns = [f'TITLE_LIST_lank{i}' for i in range(lank)]
+        df[new_columns] = self.best_columns(df=df, lank=lank, columns=TITLE_LIST)
+        df.drop(TITLE_LIST, axis=1, inplace=True)
+
+        # df = self.common_process(df, 'date', lank=3)
+        df = self.common_process(df, 'hour', lank=3)
+        # df = self.common_process(df, 'month', lank=1)
+        df = self.common_process(df, 'dayofweek', lank=1)
+        
+        return df
+
+    def common_process(self, df, word_in_colums: str, lank: int):
+        columns = df.columns[df.columns.str.contains(word_in_colums)]
+        # df[f'mean_{word_in_colums}_count'] = df[columns].mean(axis=1)
+        df[f'std_{word_in_colums}_count'] = df[columns].std(axis=1)
+        df[f'non_zero_{word_in_colums}'] = (df[columns] == 0).sum(axis=1)
+        new_columns = [f'{word_in_colums}_lank{i}' for i in range(lank)]
+        print(new_columns)
+        df[new_columns] = self.best_columns(df=df, lank=lank, columns=columns)
+        df.drop(columns, axis=1, inplace=True)
+        return df
+
+    def best_columns(self, df, lank, columns):
+        df = df[columns]
+        rename_columns = {date: i for i, date in enumerate(columns)}
+        df = df.rename(columns=rename_columns)
+        best_df = df.rank(axis=1, ascending=False).apply(
+            lambda x: pd.Series(list(x.sort_values()[0:lank].index)), axis=1
+            )
+        return best_df
