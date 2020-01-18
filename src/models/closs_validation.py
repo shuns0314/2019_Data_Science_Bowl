@@ -50,22 +50,28 @@ def stratified_group_k_fold(X, y, groups, k, seed=None):
         # val_groups = groups_per_fold[val_k]
         test_groups = groups_per_fold[test_k]
         # print(test_groups)
-        train_indices = [i for i, g in enumerate(groups) if g in train_groups]
+        # train_indices = [i for i, g in enumerate(groups) if g in train_groups]
         # val_indices = [i for i, g in enumerate(groups) if g in val_groups]
         # test_indices = {str(g): [i for i, g in enumerate(groups) if g in test_groups]}
 
-        test_indices = []
-        n_g = None
-        test_list = []
-        for i, g in enumerate(groups):
-            if g in test_groups:
-                if n_g is not None and n_g != g:
-                    test_indices.append(test_list)
-                    test_list = []
-                test_list.append(i)
-                n_g = g
+        def choice_ind(group):
+            indices = []
+            n_g = None
+            list_ = []
+            for i, g in enumerate(groups):
+                if g in group:
+                    if n_g is not None and n_g != g:
+                        indices.append(list_)
+                        list_ = []
+                    list_.append(i)
+                    n_g = g
 
-        test_indices = [np.random.choice(i) for i in test_indices]
+            indices = [np.random.choice(i) for i in indices]
+            return indices
+
+        train_indices = choice_ind(train_groups)
+        test_indices = choice_ind(test_groups)
+        # print(train_indices)
         yield train_indices, test_indices  # val_indices,
 
 
