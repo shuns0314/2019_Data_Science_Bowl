@@ -93,4 +93,5 @@ class MLPModel:
         x = 0.005
         if epoch >= 20:
             x = 0.001
+
         return x
