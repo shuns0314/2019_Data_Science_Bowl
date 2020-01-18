@@ -1,0 +1,77 @@
+train_csv: lgb_proceeded_train_20200116_102618_20200117_110006
+lgb_loss: 0.0
+mlp_loss: 0.17482905289812223
+
+lgb_ratio: 0.0
+model_average_loss: 0.17482905289812223
+
+lgb_ratio: 0.1
+model_average_loss: 0.1688504965463753
+
+lgb_ratio: 0.2
+model_average_loss: 0.14454761517412973
+
+lgb_ratio: 0.30000000000000004
+model_average_loss: 0.13418635898895692
+
+lgb_ratio: 0.4
+model_average_loss: 0.14807584737862112
+
+lgb_ratio: 0.5
+model_average_loss: 0.23248781606203972
+
+lgb_ratio: 0.6000000000000001
+model_average_loss: 0.30132303306080344
+
+lgb_ratio: 0.7000000000000001
+model_average_loss: 0.2938215311979654
+
+lgb_ratio: 0.8
+model_average_loss: 0.2117441332826686
+
+lgb_ratio: 0.9
+model_average_loss: 0.013201294488323523
+
+lgb_ratio: 1.0
+model_average_loss: 0.0
+
+best_ratio: 0
+best_loss: 0
+lgb_loss: 0.0
+mlp_loss: 0.16196573075642573
+
+lgb_ratio: 0.0
+model_average_loss: 0.16196573075642573
+
+lgb_ratio: 0.1
+model_average_loss: 0.14019415329386875
+
+lgb_ratio: 0.2
+model_average_loss: 0.1201122280756991
+
+lgb_ratio: 0.30000000000000004
+model_average_loss: 0.08333982785330085
+
+lgb_ratio: 0.4
+model_average_loss: 0.07226865129612348
+
+lgb_ratio: 0.5
+model_average_loss: 0.18645466403815925
+
+lgb_ratio: 0.6000000000000001
+model_average_loss: 0.28846955726328016
+
+lgb_ratio: 0.7000000000000001
+model_average_loss: 0.2713006840640898
+
+lgb_ratio: 0.8
+model_average_loss: 0.20253680271525387
+
+lgb_ratio: 0.9
+model_average_loss: 0.0012479374393119524
+
+lgb_ratio: 1.0
+model_average_loss: 0.0
+
+best_ratio: 0
+best_loss: 0

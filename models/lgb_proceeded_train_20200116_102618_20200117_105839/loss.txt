@@ -1,0 +1,116 @@
+train_csv: lgb_proceeded_train_20200116_102618_20200117_105839
+lgb_loss: 0.0
+mlp_loss: 0.17482905289812223
+
+lgb_ratio: 0.0
+model_average_loss: 0.17482905289812223
+
+lgb_ratio: 0.1
+model_average_loss: 0.1688504965463753
+
+lgb_ratio: 0.2
+model_average_loss: 0.14454761517412973
+
+lgb_ratio: 0.30000000000000004
+model_average_loss: 0.13418635898895692
+
+lgb_ratio: 0.4
+model_average_loss: 0.14807584737862112
+
+lgb_ratio: 0.5
+model_average_loss: 0.23248781606203972
+
+lgb_ratio: 0.6000000000000001
+model_average_loss: 0.30132303306080344
+
+lgb_ratio: 0.7000000000000001
+model_average_loss: 0.2938215311979654
+
+lgb_ratio: 0.8
+model_average_loss: 0.2117441332826686
+
+lgb_ratio: 0.9
+model_average_loss: 0.013201294488323523
+
+lgb_ratio: 1.0
+model_average_loss: 0.0
+
+best_ratio: 0
+best_loss: 0
+lgb_loss: 0.0
+mlp_loss: 0.16168724552215064
+
+lgb_ratio: 0.0
+model_average_loss: 0.16168724552215064
+
+lgb_ratio: 0.1
+model_average_loss: 0.1393250509649938
+
+lgb_ratio: 0.2
+model_average_loss: 0.11664843363058675
+
+lgb_ratio: 0.30000000000000004
+model_average_loss: 0.08172991732911328
+
+lgb_ratio: 0.4
+model_average_loss: 0.07406208630539834
+
+lgb_ratio: 0.5
+model_average_loss: 0.18977528070193883
+
+lgb_ratio: 0.6000000000000001
+model_average_loss: 0.28594705967742484
+
+lgb_ratio: 0.7000000000000001
+model_average_loss: 0.2709804414021104
+
+lgb_ratio: 0.8
+model_average_loss: 0.20223978514589835
+
+lgb_ratio: 0.9
+model_average_loss: 0.0012479374393119524
+
+lgb_ratio: 1.0
+model_average_loss: 0.0
+
+best_ratio: 0
+best_loss: 0
+lgb_loss: 0.0
+mlp_loss: 0.13165312248565286
+
+lgb_ratio: 0.0
+model_average_loss: 0.13165312248565286
+
+lgb_ratio: 0.1
+model_average_loss: 0.15686919081569772
+
+lgb_ratio: 0.2
+model_average_loss: 0.15204559064496814
+
+lgb_ratio: 0.30000000000000004
+model_average_loss: 0.12310226557005133
+
+lgb_ratio: 0.4
+model_average_loss: 0.08182344851247947
+
+lgb_ratio: 0.5
+model_average_loss: 0.08879294774831725
+
+lgb_ratio: 0.6000000000000001
+model_average_loss: 0.22211304108545937
+
+lgb_ratio: 0.7000000000000001
+model_average_loss: 0.270209280527444
+
+lgb_ratio: 0.8
+model_average_loss: 0.23551752903057277
+
+lgb_ratio: 0.9
+model_average_loss: 0.026273466529516787
+
+lgb_ratio: 1.0
+model_average_loss: 0.0
+
+best_ratio: 0
+best_loss: 0
+seed_average_loss: 0.0

@@ -1,0 +1,2 @@
+train_csv: lgb_proceeded_train_20200116_102618_20200117_201103
+mlp_loss: 0.5141310305699531
