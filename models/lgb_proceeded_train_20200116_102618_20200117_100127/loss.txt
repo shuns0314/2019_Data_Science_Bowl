@@ -1,0 +1,11 @@
+train_csv: lgb_proceeded_train_20200116_102618_20200117_100127
+lgb_loss: 0.0
+mlp_loss: 0.17324426418880756
+model_average_loss: 0.24395191198124944
+lgb_loss: 0.0
+mlp_loss: 0.16210968339514054
+model_average_loss: 0.1541306053045175
+lgb_loss: 0.0
+mlp_loss: 0.144846208030054
+model_average_loss: 0.10305987758865076
+seed_average_loss: 0.16704746495813924

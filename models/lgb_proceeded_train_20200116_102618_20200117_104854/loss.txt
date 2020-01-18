@@ -1,0 +1,8 @@
+train_csv: lgb_proceeded_train_20200116_102618_20200117_104854
+lgb_loss: 0.5463659862218153
+mlp_loss: 0.5365621185878735
+
+lgb_ratio: 0.0
+model_average_loss: 0.5365621185878735
+
+lgb_ratio: 0.1

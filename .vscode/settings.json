@@ -5,6 +5,9 @@
     "python.testing.nosetestsEnabled": false,
     "python.linting.pylintEnabled": false,
     "python.linting.enabled": true,
-    "python.pythonPath": "C:\\Users\\shunak\\Anaconda3\\envs\\bci-web\\python.exe",
-    "python.linting.flake8Enabled": true
+    "python.pythonPath": "/usr/local/bin/python",
+    "python.linting.flake8Enabled": true,
+    "python.linting.flake8Args": [
+        "--max-line-length=120",
+    ],
 }

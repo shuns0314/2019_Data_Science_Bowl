@@ -1,9 +1,9 @@
+
 data/*
 models/*/*.csv
 models/*/*.pkl
 .mypy_cache/*
 kaggle.json
 *.pyc
-
-!.gitkeep
 lgb_output/*
+!.gitkeep
