@@ -146,13 +146,6 @@ def preprocess(train: pd.DataFrame,
         test_set=True)
     compiled_test = compile_history.compile_history_data(test)
 
-    feature_preprocess = PreprocessFeatures()
-    compiled_train = feature_preprocess.process(compiled_train)
-    compiled_test = feature_preprocess.process(compiled_test)
-
-    mutual_feature_preprocess = MutualPreprocessFeatures()
-    compiled_train, compiled_test = mutual_feature_preprocess.process(compiled_train, compiled_test)
-
     now = datetime.now().strftime('%Y%m%d_%H%M%S')
     compiled_train.to_csv(f'/code/data/processed/proceeded_train_{now}.csv')
     compiled_test.to_csv(f'/code/data/processed/proceeded_test_{now}.csv')
