@@ -7,3 +7,4 @@ kaggle.json
 *.pyc
 lgb_output/*
 !.gitkeep
+models/*/lgb_output/*.pkl
