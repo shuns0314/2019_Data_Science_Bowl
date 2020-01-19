@@ -88,6 +88,9 @@ def preprocess(train: pd.DataFrame,
     compiled_train = feature_preprocess(compiled_train)
     compiled_test = feature_preprocess(compiled_test)
 
+    compiled_train.to_csv('five_train_features.csv')
+    compiled_test.to_csv('five_test_features.csv')
+
     return compiled_train, compiled_test
 
 

@@ -36,6 +36,8 @@ def preprocess(train_df: pd.DataFrame,
     compile_history = CompileHistory(win_code=win_code, test_set=True)
     compiled_test = compile_history.compile_history_data(test_df)
 
+    compiled_train.to_csv('train_second_features.csv')
+    compiled_test.to_csv('train_second_features.csv')
     return compiled_train, compiled_test
 
 
