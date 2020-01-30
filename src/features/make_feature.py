@@ -74,18 +74,18 @@ class GetData():
         self.accumulated_game_miss = 0
 
         self.game_round = []
-        self.game_duration = []
+        # self.game_duration = []
         self.game_level = []
 
         self.good_comment = 0
         self.coordinates = 0
         self.coordinates = 0
-        self.description_val = 0
+        # self.description_val = 0
         self.description = 0
 
-        self.coordinates_x = []
-        self.coordinates_y = []
-        self.size = []
+        # self.coordinates_x = []
+        # self.coordinates_y = []
+        # self.size = []
 
     def process(self, user_sample, installation_id):
 
@@ -133,17 +133,17 @@ class GetData():
                 except:
                     pass
 
-                try:
-                    game_duration_ = json.loads(session['event_data'].iloc[-1])["duration"]
-                    self.game_duration.append(game_duration_)
-                except:
-                    pass
+                # try:
+                #     game_duration_ = json.loads(session['event_data'].iloc[-1])["duration"]
+                #     self.game_duration.append(game_duration_)
+                # except:
+                #     pass
 
-                try:
-                    game_level_ = json.loads(session['event_data'].iloc[-1])["level"]
-                    self.game_level.append(game_level_)
-                except:
-                    pass
+                # try:
+                #     game_level_ = json.loads(session['event_data'].iloc[-1])["level"]
+                #     self.game_level.append(game_level_)
+                # except:
+                #     pass
 
 
             # session typeがAssessmentのやつだけ、カウントする。
@@ -163,7 +163,7 @@ class GetData():
                     # features.update(self.month_count.copy())
                     features.update(self.hour_count.copy())
                     features.update(self.dayofweek_count.copy())
-                    features.update(self.nearly_user_activities_count.copy())
+                    # features.update(self.nearly_user_activities_count.copy())
 
                     features.update(self.title_count.copy())
                     #  features.update(self.title_event_code_count.copy())
@@ -176,54 +176,54 @@ class GetData():
                     features['mean_game_round'] = np.mean(self.game_round) if len(self.game_round) != 0 else 0
                     features['max_game_round'] = np.max(self.game_round) if len(self.game_round) != 0 else 0
                     # features['sum_game_round'] = np.max(self.game_round) if len(self.game_round) != 0 else 0
-                    features['mean_game_duration'] = np.mean(self.game_duration) if len(self.game_duration) != 0 else 0
-                    features['max_game_duration'] = np.max(self.game_duration) if len(self.game_duration) != 0 else 0
-                    features['sum_game_duration'] = np.sum(self.game_duration) if len(self.game_duration) != 0 else 0
-                    features['std_game_duration'] = np.std(self.game_duration) if len(self.game_duration) != 0 else 0
-                    features['mean_game_level'] = np.mean(self.game_level) if len(self.game_level) != 0 else 0
+                    # features['mean_game_duration'] = np.mean(self.game_duration) if len(self.game_duration) != 0 else 0
+                    # features['max_game_duration'] = np.max(self.game_duration) if len(self.game_duration) != 0 else 0
+                    # features['sum_game_duration'] = np.sum(self.game_duration) if len(self.game_duration) != 0 else 0
+                    # features['std_game_duration'] = np.std(self.game_duration) if len(self.game_duration) != 0 else 0
+                    # features['mean_game_level'] = np.mean(self.game_level) if len(self.game_level) != 0 else 0
                     # features['max_game_level'] = np.max(self.game_level) if len(self.game_level) != 0 else 0
                     # features['sum_game_level'] = np.sum(self.game_level) if len(self.game_level) != 0 else 0
 
-                    features['mean_coordinates_x'] = np.nanmean(self.coordinates_x) if len(self.coordinates_x) != 0 else 0
-                    features['std_coordinates_x'] = np.nanstd(self.coordinates_x) if len(self.coordinates_x) != 0 else 0
-                    features['mean_coordinates_y'] = np.nanmean(self.coordinates_y) if len(self.coordinates_y) != 0 else 0
-                    features['std_coordinates_y'] = np.nanstd(self.coordinates_y) if len(self.coordinates_y) != 0 else 0
+                    # features['mean_coordinates_x'] = np.nanmean(self.coordinates_x) if len(self.coordinates_x) != 0 else 0
+                    # features['std_coordinates_x'] = np.nanstd(self.coordinates_x) if len(self.coordinates_x) != 0 else 0
+                    # features['mean_coordinates_y'] = np.nanmean(self.coordinates_y) if len(self.coordinates_y) != 0 else 0
+                    # features['std_coordinates_y'] = np.nanstd(self.coordinates_y) if len(self.coordinates_y) != 0 else 0
 
-                    features['mean_size'] = np.nanmean(self.size) if len(self.size) != 0 else 0
-                    features['max_size'] = np.nanmax(self.size) if len(self.size) != 0 else 0
+                    # features['mean_size'] = np.nanmean(self.size) if len(self.size) != 0 else 0
+                    # features['max_size'] = np.nanmax(self.size) if len(self.size) != 0 else 0
 
                     features['good_comment'] = self.good_comment
 
-                    features['description'] = self.description
+                    # features['description'] = self.description
                     features['coordinates'] = self.coordinates
-                    features['description_val'] = self.description_val
+                    # features['description_val'] = self.description_val
 
                     all_assessments.append(features)
 
 
-            coordinates = session['event_data'].str.contains('coordinates').sum()
-            self.coordinates += coordinates
+            # coordinates = session['event_data'].str.contains('coordinates').sum()
+            # self.coordinates += coordinates
 
-            description = session['event_data'].str.contains('description').sum()
-            self.description += description
+            # description = session['event_data'].str.contains('description').sum()
+            # self.description += description
 
-            event_data = pd.io.json.json_normalize(session.event_data.apply(json.loads))
-            try:
-                self.coordinates_x += (event_data['coordinates.x']/event_data['coordinates.stage_width']).to_list()
-            except:
-                pass
-            try:
-                self.coordinates_y += (event_data['coordinates.y']/event_data['coordinates.stage_height']).to_list()
-            except:
-                pass
-            try:
-                self.size += event_data['size'].to_list()
-            except:
-                pass
-            try:
-                self.description_val = len(set(event_data['description']))
-            except:
-                pass
+            # event_data = pd.io.json.json_normalize(session.event_data.apply(json.loads))
+            # try:
+            #     self.coordinates_x += (event_data['coordinates.x']/event_data['coordinates.stage_width']).to_list()
+            # except:
+            #     pass
+            # try:
+            #     self.coordinates_y += (event_data['coordinates.y']/event_data['coordinates.stage_height']).to_list()
+            # except:
+            #     pass
+            # try:
+            #     self.size += event_data['size'].to_list()
+            # except:
+            #     pass
+            # try:
+            #     self.description_val = len(set(event_data['description']))
+            # except:
+            #     pass
 
             good_comment_list = ['Good', 'good', 'cool', 'Cool', 'Nice', 'nice', 'Great', 'great', 'Amaging']
             for comment in good_comment_list:
@@ -350,7 +350,7 @@ class GetAssessmentFeature:
         self.last_accuracy_title['acc_' + session_title_text] = accuracy
 
         # 特徴量に前回までの平均ゲーム時間を追加
-        features = self.add_duration_mean(features, session)
+        # features = self.add_duration_mean(features, session)
 
         # 特徴量に今回のacc_groupを追加
         features = self.add_accuracy_group(features, accuracy)
@@ -380,23 +380,23 @@ class GetAssessmentFeature:
                 # print(features)
                 return features
 
-    def add_duration_mean(self, df, session):
-        if self.durations == []:
-            df['duration_mean'] = 0
-            df['duration_max'] = 0
-            df['duration_std'] = 0
-            df['duration_median'] = 0
+    # def add_duration_mean(self, df, session):
+    #     if self.durations == []:
+    #         df['duration_mean'] = 0
+    #         df['duration_max'] = 0
+    #         df['duration_std'] = 0
+    #         df['duration_median'] = 0
 
-        else:
-            df['duration_mean'] = np.mean(self.durations)
-            df['duration_max'] = np.max(self.durations)
-            df['duration_std'] = np.std(self.durations)
-            df['duration_median'] = np.median(self.durations)
+    #     else:
+    #         df['duration_mean'] = np.mean(self.durations)
+    #         df['duration_max'] = np.max(self.durations)
+    #         df['duration_std'] = np.std(self.durations)
+    #         df['duration_median'] = np.median(self.durations)
 
-        self.durations.append(
-            (session.iloc[-1, session.columns.get_loc('timestamp')] - session.iloc[0, session.columns.get_loc('timestamp')]).seconds
-            )
-        return df
+        # self.durations.append(
+        #     (session.iloc[-1, session.columns.get_loc('timestamp')] - session.iloc[0, session.columns.get_loc('timestamp')]).seconds
+        #     )
+        # return df
 
     def add_accuracy_group(self,
                            df: pd.DataFrame,

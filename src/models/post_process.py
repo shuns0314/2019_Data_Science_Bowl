@@ -1,7 +1,7 @@
 import numpy as np
 import optuna
 
-from .loss_function import qwk
+from src.models.loss_function import qwk
 
 
 def post_processing(y_test, y_pred):

@@ -336,11 +336,11 @@ class GetData():
                 except:
                     pass
 
-                try:
-                    game_level_ = json.loads(session['event_data'].iloc[-1])["level"]
-                    self.game_level.append(game_level_)
-                except:
-                    pass
+                # try:
+                #     game_level_ = json.loads(session['event_data'].iloc[-1])["level"]
+                #     self.game_level.append(game_level_)
+                # except:
+                #     pass
 
 
             # session typeがAssessmentのやつだけ、カウントする。
@@ -377,7 +377,7 @@ class GetData():
                     features['max_game_duration'] = np.max(self.game_duration) if len(self.game_duration) != 0 else 0
                     features['sum_game_duration'] = np.sum(self.game_duration) if len(self.game_duration) != 0 else 0
                     features['std_game_duration'] = np.std(self.game_duration) if len(self.game_duration) != 0 else 0
-                    features['mean_game_level'] = np.mean(self.game_level) if len(self.game_level) != 0 else 0
+                    # features['mean_game_level'] = np.mean(self.game_level) if len(self.game_level) != 0 else 0
                     # features['max_game_level'] = np.max(self.game_level) if len(self.game_level) != 0 else 0
                     # features['sum_game_level'] = np.sum(self.game_level) if len(self.game_level) != 0 else 0
 
